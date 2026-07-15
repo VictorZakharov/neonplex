@@ -8,16 +8,12 @@ describe('PlayerStepController', () => {
 
     expect(steps.accept('right')).toBe(true);
     expect(steps.accept('down')).toBe(true);
-    expect(steps.accept('left')).toBe(true);
 
     expect(steps.directionFor(null, null)).toBe('right');
     expect(steps.directionFor(null, null)).toBe('right');
 
     steps.complete(null);
     expect(steps.directionFor(null, null)).toBe('down');
-
-    steps.complete(null);
-    expect(steps.directionFor(null, null)).toBe('left');
 
     steps.complete(null);
     expect(steps.directionFor(null, 'up')).toBe('up');
@@ -32,16 +28,16 @@ describe('PlayerStepController', () => {
     expect(steps.directionFor(null, null)).toBe('left');
   });
 
-  it('uses an explicit cancellation edge to discard every pending step', () => {
+  it('clears every pending step immediately', () => {
     const steps = new PlayerStepController();
     steps.accept('left');
     steps.accept('down');
 
-    expect(steps.accept(null)).toBe(false);
+    steps.clear();
     expect(steps.directionFor(null, null)).toBeNull();
   });
 
-  it('rejects overflow without replacing accepted turns', () => {
+  it('applies two-step backpressure without replacing accepted turns', () => {
     const steps = new PlayerStepController();
     const accepted = Array.from(
       { length: PLAYER_STEP_QUEUE_CAPACITY },
@@ -56,5 +52,7 @@ describe('PlayerStepController', () => {
       steps.complete(null);
     });
     expect(steps.directionFor(null, null)).toBeNull();
+
+    expect(steps.accept('left')).toBe(true);
   });
 });

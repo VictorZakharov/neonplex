@@ -26,6 +26,7 @@ export class CanvasGestureController {
   private canvasGeometryReady = false;
   private mousePanPointerId: number | null = null;
   private mousePanStart: ScreenPoint = { x: 0, y: 0 };
+  private mousePanPoint: ScreenPoint = { x: 0, y: 0 };
   private touchMode: TouchGestureMode = 'idle';
   private primaryTouchId: number | null = null;
   private touchStart: ScreenPoint = { x: 0, y: 0 };
@@ -39,7 +40,7 @@ export class CanvasGestureController {
     private readonly interactions: CameraInteractionCallbacks,
   ) {
     this.playerDrag = new PlayerDragTracker(
-      (direction) => this.interactions.onPlayerStep?.(direction),
+      (direction) => this.interactions.onPlayerStep?.(direction) ?? false,
       () => this.interactions.onPlayerDragEnd?.(),
     );
     canvas.addEventListener('wheel', this.onWheel, {
@@ -67,9 +68,6 @@ export class CanvasGestureController {
     window.addEventListener('blur', this.onWindowBlur, {
       signal: this.abortController.signal,
     });
-    window.addEventListener('orientationchange', this.onOrientationChange, {
-      signal: this.abortController.signal,
-    });
     document.addEventListener('visibilitychange', this.onVisibilityChange, {
       signal: this.abortController.signal,
     });
@@ -83,6 +81,51 @@ export class CanvasGestureController {
   public cancel(cancelTravel: boolean): void {
     this.cancelTouchGesture(cancelTravel);
     this.cancelMousePan(cancelTravel);
+  }
+
+  /** Preserves active pointers while their canvas coordinate space changes. */
+  public handleViewportResize(): void {
+    if (!this.canvasGeometryReady) {
+      this.measureCanvasGeometry();
+      return;
+    }
+
+    const previousLeft = this.canvasLeft;
+    const previousTop = this.canvasTop;
+    const previousScaleX = this.canvasScaleX;
+    const previousScaleY = this.canvasScaleY;
+    this.measureCanvasGeometry();
+
+    const remap = (point: ScreenPoint): ScreenPoint => ({
+      x: (
+        previousLeft + point.x / previousScaleX - this.canvasLeft
+      ) * this.canvasScaleX,
+      y: (
+        previousTop + point.y / previousScaleY - this.canvasTop
+      ) * this.canvasScaleY,
+    });
+
+    this.touchStart = remap(this.touchStart);
+    this.mousePanStart = remap(this.mousePanStart);
+    this.mousePanPoint = remap(this.mousePanPoint);
+    this.pinchCentroid = remap(this.pinchCentroid);
+    for (const [pointerId, point] of this.touchPoints) {
+      this.touchPoints.set(pointerId, remap(point));
+    }
+
+    if (this.touchMode === 'player' && this.primaryTouchId !== null) {
+      const point = this.touchPoints.get(this.primaryTouchId);
+      if (point !== undefined) this.playerDrag.rebase(point);
+    }
+    if (this.touchMode === 'pinch' && this.pinchPointerIds !== null) {
+      const first = this.touchPoints.get(this.pinchPointerIds[0]);
+      const second = this.touchPoints.get(this.pinchPointerIds[1]);
+      if (first !== undefined && second !== undefined) {
+        this.pinchCentroid = midpointBetween(first, second);
+        this.pinchScaleDistance = Math.max(0.001, distanceBetween(first, second));
+      }
+    }
+    this.rebaseActivePan();
   }
 
   private canvasPoint(event: MouseEvent): ScreenPoint {
@@ -127,6 +170,19 @@ export class CanvasGestureController {
     this.canvas.dataset.panning = String(panning);
   }
 
+  private rebaseActivePan(): void {
+    if (this.mousePanPointerId !== null) {
+      this.mousePanStart = { ...this.mousePanPoint };
+      this.host.beginPan();
+      return;
+    }
+    if (this.touchMode !== 'pan' || this.primaryTouchId === null) return;
+    const point = this.touchPoints.get(this.primaryTouchId);
+    if (point === undefined) return;
+    this.touchStart = { ...point };
+    this.host.beginPan();
+  }
+
   private beginUserGesture(): void {
     this.interactions.onUserGesture?.();
     this.interactions.onCancelTravel?.();
@@ -142,6 +198,7 @@ export class CanvasGestureController {
     this.measureCanvasGeometry();
     this.mousePanPointerId = event.pointerId;
     this.mousePanStart = this.canvasPoint(event);
+    this.mousePanPoint = { ...this.mousePanStart };
     this.host.beginPan();
     this.capturePointer(event.pointerId);
     this.updatePanningState();
@@ -151,6 +208,7 @@ export class CanvasGestureController {
     if (event.pointerId !== this.mousePanPointerId) return;
     event.preventDefault();
     const point = this.canvasPoint(event);
+    this.mousePanPoint = point;
     if (distanceBetween(this.mousePanStart, point) < 2) return;
     this.host.panBy({
       x: point.x - this.mousePanStart.x,
@@ -221,7 +279,10 @@ export class CanvasGestureController {
       y: point.y - this.touchStart.y,
     };
     if (this.touchMode === 'player') {
-      this.playerDrag.update(point);
+      this.playerDrag.update(
+        point,
+        this.host.getPlayerScreenAnchor()?.tileSize,
+      );
       return;
     }
 
@@ -371,10 +432,6 @@ export class CanvasGestureController {
   };
 
   private readonly onWindowBlur = (): void => {
-    this.cancel(true);
-  };
-
-  private readonly onOrientationChange = (): void => {
     this.cancel(true);
   };
 

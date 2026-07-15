@@ -109,32 +109,38 @@ export class CameraController {
   }
 
   public handleViewportResize(viewport: Viewport): void {
-    if (viewport.width === this.viewport.width && viewport.height === this.viewport.height) {
-      return;
-    }
-    this.gestures.cancel(true);
-    this.settleAnimatedZoom();
-    const snapshot = this.lastSnapshot;
-    if (snapshot !== null && this.cameraReady) {
-      if (this.manuallyPanned) {
-        const camera = preserveViewportWorldCenter({
-          cameraLeft: this.cameraLeft,
-          cameraTop: this.cameraTop,
-          previousViewport: this.viewport,
-          nextViewport: viewport,
-          previousTileSize: this.lastBaseTile * this.zoom,
-          nextTileSize: this.baseTileForViewport(viewport) * this.zoom,
-          boardWidth: snapshot.width,
-          boardHeight: snapshot.height,
-          padding: this.outerPaddingFor(viewport),
-        });
-        this.cameraLeft = camera.left;
-        this.cameraTop = camera.top;
-      } else {
-        this.cameraReady = false;
+    const previousViewport = this.viewport;
+    const dimensionsChanged =
+      viewport.width !== previousViewport.width ||
+      viewport.height !== previousViewport.height;
+    this.viewport = viewport;
+
+    if (dimensionsChanged) {
+      this.settleAnimatedZoom();
+      const snapshot = this.lastSnapshot;
+      if (snapshot !== null && this.cameraReady) {
+        if (this.manuallyPanned) {
+          const camera = preserveViewportWorldCenter({
+            cameraLeft: this.cameraLeft,
+            cameraTop: this.cameraTop,
+            previousViewport,
+            nextViewport: viewport,
+            previousTileSize: this.lastBaseTile * this.zoom,
+            nextTileSize: this.baseTileForViewport(viewport) * this.zoom,
+            boardWidth: snapshot.width,
+            boardHeight: snapshot.height,
+            padding: this.outerPaddingFor(viewport),
+          });
+          this.cameraLeft = camera.left;
+          this.cameraTop = camera.top;
+        } else {
+          this.cameraReady = false;
+        }
       }
     }
-    this.viewport = viewport;
+
+    // Rebase pointer and pan origins only after the camera has its preserved position.
+    this.gestures.handleViewportResize();
   }
 
   public updateZoom(deltaSeconds: number, viewport: Viewport): void {

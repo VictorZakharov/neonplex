@@ -1,4 +1,3 @@
-import { PLAYER_STEP_QUEUE_CAPACITY } from '../game/playerStepConfig';
 import type { Direction, InputFrame, Point } from '../game/types';
 import { ActionChordState } from './ActionChordState';
 import type { InputCallbacks } from './inputTypes';
@@ -35,9 +34,6 @@ export class InputManager {
   private readonly actionSources = new Set<string>();
   private readonly actionChord = new ActionChordState();
   private virtualJoystick: VirtualJoystick | null = null;
-  private readonly pendingPlayerSteps: Direction[] = [];
-  private playerStepCancellationPending = false;
-  private playerStepSessionHasSteps = false;
   private playerStepActive = false;
   private pendingTravelTarget: Point | null | undefined;
   private travelActive = false;
@@ -56,8 +52,6 @@ export class InputManager {
     window.addEventListener('keydown', this.onKeyDown, options);
     window.addEventListener('keyup', this.onKeyUp, options);
     window.addEventListener('blur', this.clear, options);
-    window.addEventListener('resize', this.clear, options);
-    window.addEventListener('orientationchange', this.clear, options);
     document.addEventListener('visibilitychange', this.onVisibilityChange, options);
     this.root.addEventListener('pointerdown', this.onPointerModality, {
       ...options,
@@ -82,12 +76,10 @@ export class InputManager {
 
   public consumeFrame(): InputFrame {
     const frame = this.actionChord.consume(this.currentDirection());
-    const stepDirection = this.nextPlayerStepEdge();
     const travelTarget = this.pendingTravelTarget;
     this.pendingTravelTarget = undefined;
     return {
       ...frame,
-      ...(stepDirection === undefined ? {} : { stepDirection }),
       ...(travelTarget === undefined ? {} : { travelTarget }),
     };
   }
@@ -118,19 +110,17 @@ export class InputManager {
     this.travelActive = false;
   }
 
-  public queuePlayerStep(direction: Direction): void {
-    if (this.actionSources.size > 0 || this.currentDirection() !== null) return;
+  public queuePlayerStep(direction: Direction): boolean {
+    if (this.actionSources.size > 0 || this.currentDirection() !== null) return false;
     this.cancelTravel();
-    this.playerStepActive = true;
-    this.playerStepSessionHasSteps = true;
-    // Preserve the earliest accepted path when input temporarily outruns rendering.
-    if (this.pendingPlayerSteps.length >= PLAYER_STEP_QUEUE_CAPACITY) return;
-    this.pendingPlayerSteps.push(direction);
+    const accepted = this.callbacks.onPlayerStep(direction);
+    this.playerStepActive ||= accepted;
+    return accepted;
   }
 
-  /** Ends the gesture without discarding discrete steps already accepted from it. */
+  /** A released or cancelled drag must never leave latent movement behind. */
   public endPlayerDrag(): void {
-    this.playerStepActive = false;
+    this.cancelPlayerSteps();
   }
 
   public getRestartHoldProgress(currentTimeMs: number): number | null {
@@ -149,7 +139,7 @@ export class InputManager {
     this.actionSources.clear();
     this.actionChord.clear();
     this.virtualJoystick?.reset();
-    this.discardPlayerSteps();
+    this.cancelPlayerSteps();
     this.cancelTravel();
   }
 
@@ -303,7 +293,7 @@ export class InputManager {
     const previousDirection = this.heldDirectionSources.get(source);
     if (previousDirection === direction) return;
     if (this.actionChord.pressDirection(direction)) this.cancelActionTimer();
-    this.discardPlayerSteps();
+    this.cancelPlayerSteps();
     this.cancelTravel();
     this.heldDirectionSources.set(source, direction);
     const previousIndex = this.directionSourceOrder.indexOf(source);
@@ -326,7 +316,7 @@ export class InputManager {
   private pressActionSource(source: string): void {
     if (this.actionSources.has(source)) return;
     this.cancelTravel();
-    this.discardPlayerSteps();
+    this.cancelPlayerSteps();
     this.actionSources.add(source);
     if (this.actionSources.size === 1) this.beginActionHold();
   }
@@ -339,19 +329,8 @@ export class InputManager {
     this.actionChord.releaseAction();
   }
 
-  private nextPlayerStepEdge(): Direction | null | undefined {
-    if (this.playerStepCancellationPending) {
-      this.playerStepCancellationPending = false;
-      return null;
-    }
-    return this.pendingPlayerSteps.shift();
-  }
-
-  private discardPlayerSteps(): void {
+  private cancelPlayerSteps(): void {
     this.playerStepActive = false;
-    this.pendingPlayerSteps.length = 0;
-    if (!this.playerStepSessionHasSteps) return;
-    this.playerStepSessionHasSteps = false;
-    this.playerStepCancellationPending = true;
+    this.callbacks.onCancelPlayerSteps();
   }
 }

@@ -27,7 +27,11 @@ const createHarness = (map: readonly string[]): {
   engine.start();
   return {
     engine,
-    input: new InputManager({} as HTMLElement, callbacks),
+    input: new InputManager({} as HTMLElement, {
+      ...callbacks,
+      onPlayerStep: (direction) => engine.queuePlayerStep(direction),
+      onCancelPlayerSteps: () => engine.cancelPlayerSteps(),
+    }),
   };
 };
 
@@ -96,7 +100,6 @@ describe('mobile travel input bridge', () => {
       direction: null,
       action: false,
       excavate: null,
-      stepDirection: 'left',
       travelTarget: null,
     });
     applyFrame(engine, dragFrame);
@@ -109,22 +112,17 @@ describe('mobile travel input bridge', () => {
     expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
   });
 
-  it('keeps burst-sampled drag turns ordered through the movement cooldown', () => {
+  it('limits a drag burst to the engine two-step queue capacity', () => {
     const { engine, input } = createHarness([
       '#######',
       '#@   E#',
       '#     #',
       '#######',
     ]);
-    const drag = new PlayerDragTracker(
-      (direction) => input.queuePlayerStep(direction),
-      () => input.endPlayerDrag(),
-    );
-    drag.begin({ x: 0, y: 0 }, 30);
-    drag.update({ x: 60, y: 0 });
-    drag.update({ x: 60, y: 30 });
-    drag.update({ x: 30, y: 30 });
-    drag.end();
+
+    expect(input.queuePlayerStep('right')).toBe(true);
+    expect(input.queuePlayerStep('down')).toBe(true);
+    expect(input.queuePlayerStep('left')).toBe(false);
 
     const visited: { x: number; y: number }[] = [];
     let previous = engine.getSnapshot().player;
@@ -139,10 +137,37 @@ describe('mobile travel input bridge', () => {
 
     expect(visited).toEqual([
       { x: 2, y: 1 },
-      { x: 3, y: 1 },
-      { x: 3, y: 2 },
       { x: 2, y: 2 },
     ]);
+  });
+
+  it('cancels queued drag motion immediately when the finger is released', () => {
+    const { engine, input } = createHarness(['########', '#@    E#', '########']);
+
+    expect(input.queuePlayerStep('right')).toBe(true);
+    expect(input.queuePlayerStep('right')).toBe(true);
+    input.endPlayerDrag();
+    update(engine, input, 30);
+
+    expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
+  });
+
+  it('attempts the next queued turn immediately after a blocked step', () => {
+    const { engine, input } = createHarness([
+      '#####',
+      '#@#E#',
+      '#   #',
+      '#####',
+    ]);
+
+    expect(input.queuePlayerStep('right')).toBe(true);
+    expect(input.queuePlayerStep('down')).toBe(true);
+
+    update(engine, input);
+    expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
+
+    update(engine, input);
+    expect(engine.getSnapshot().player).toEqual({ x: 1, y: 2 });
   });
 
   it('stops an in-progress route when the input bridge explicitly cancels it', () => {

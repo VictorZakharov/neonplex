@@ -5,22 +5,27 @@ import type {
   CanvasGestureHost,
   PinchGestureUpdate,
   ScreenPoint,
+  Viewport,
 } from './renderTypes';
 
 class FakeCanvas extends EventTarget {
   public readonly captures = new Set<number>();
   public readonly dataset: Record<string, string> = {};
+  public left = 0;
+  public top = 0;
+  public width = 400;
+  public height = 300;
 
   public getBoundingClientRect(): DOMRect {
     return {
-      bottom: 300,
-      height: 300,
-      left: 0,
-      right: 400,
-      top: 0,
-      width: 400,
-      x: 0,
-      y: 0,
+      bottom: this.top + this.height,
+      height: this.height,
+      left: this.left,
+      right: this.left + this.width,
+      top: this.top,
+      width: this.width,
+      x: this.left,
+      y: this.top,
       toJSON: () => ({}),
     };
   }
@@ -67,12 +72,13 @@ describe('CanvasGestureController', () => {
   let fakeWindow: EventTarget;
   let fakeDocument: FakeDocument;
   let canvas: FakeCanvas;
+  let viewport: Viewport;
   let beginPan: jest.Mock<void, []>;
   let panBy: jest.Mock<void, [ScreenPoint]>;
   let applyPinch: jest.Mock<void, [PinchGestureUpdate]>;
   let dispatchTap: jest.Mock<void, [ScreenPoint]>;
   let zoomFromWheel: jest.Mock<void, [boolean, ScreenPoint]>;
-  let onPlayerStep: jest.Mock<void, [Direction]>;
+  let onPlayerStep: jest.Mock<boolean, [Direction]>;
   let onPlayerDragEnd: jest.Mock<void, []>;
   let onCancelTravel: jest.Mock<void, []>;
   let onUserGesture: jest.Mock<void, []>;
@@ -82,12 +88,13 @@ describe('CanvasGestureController', () => {
     fakeWindow = new EventTarget();
     fakeDocument = new FakeDocument();
     canvas = new FakeCanvas();
+    viewport = { width: 400, height: 300 };
     beginPan = jest.fn();
     panBy = jest.fn();
     applyPinch = jest.fn();
     dispatchTap = jest.fn();
     zoomFromWheel = jest.fn();
-    onPlayerStep = jest.fn();
+    onPlayerStep = jest.fn<boolean, [Direction]>(() => true);
     onPlayerDragEnd = jest.fn();
     onCancelTravel = jest.fn();
     onUserGesture = jest.fn();
@@ -102,7 +109,7 @@ describe('CanvasGestureController', () => {
     });
 
     const host: CanvasGestureHost = {
-      getViewport: () => ({ width: 400, height: 300 }),
+      getViewport: () => viewport,
       getPlayerScreenAnchor: () => ({ x: 100, y: 100, tileSize: 30 }),
       beginPan,
       panBy,
@@ -154,6 +161,22 @@ describe('CanvasGestureController', () => {
     expect(dispatchTap).not.toHaveBeenCalled();
   });
 
+  it('rebases an active touch pan when canvas geometry changes at the same viewport size', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 20, 220, 180));
+    canvas.dispatchEvent(pointerEvent('pointermove', 20, 240, 180));
+    expect(beginPan).toHaveBeenCalledTimes(1);
+    expect(panBy).toHaveBeenLastCalledWith({ x: 20, y: 0 });
+
+    canvas.left = 20;
+    controller.handleViewportResize();
+    expect(beginPan).toHaveBeenCalledTimes(2);
+
+    panBy.mockClear();
+    canvas.dispatchEvent(pointerEvent('pointermove', 20, 250, 180));
+    expect(panBy).toHaveBeenCalledWith({ x: 10, y: 0 });
+    expect(canvas.captures.has(20)).toBe(true);
+  });
+
   it('steps only while the finger keeps advancing', () => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 3, 127, 100));
     canvas.dispatchEvent(pointerEvent('pointermove', 3, 165, 100));
@@ -186,6 +209,41 @@ describe('CanvasGestureController', () => {
       'left',
     ]);
     expect(onPlayerDragEnd).not.toHaveBeenCalled();
+  });
+
+  it('preserves a captured player drag across a mobile viewport reflow', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 32, 100, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 32, 130, 100));
+    expect(onPlayerStep.mock.calls.map(([direction]) => direction)).toEqual(['right']);
+
+    canvas.top = 20;
+    canvas.height = 280;
+    viewport = { width: 400, height: 280 };
+    controller.handleViewportResize();
+    canvas.dispatchEvent(pointerEvent('pointermove', 32, 160, 100));
+
+    expect(onPlayerStep.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+      'right',
+    ]);
+    expect(onPlayerDragEnd).not.toHaveBeenCalled();
+    expect(canvas.captures.has(32)).toBe(true);
+  });
+
+  it('does not cancel a captured player drag on orientationchange alone', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 33, 100, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 33, 130, 100));
+    onPlayerDragEnd.mockClear();
+    onCancelTravel.mockClear();
+
+    fakeWindow.dispatchEvent(new Event('orientationchange'));
+
+    expect(onPlayerDragEnd).not.toHaveBeenCalled();
+    expect(onCancelTravel).not.toHaveBeenCalled();
+    expect(canvas.captures.has(33)).toBe(true);
+
+    canvas.dispatchEvent(pointerEvent('pointerup', 33, 130, 100));
+    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
   });
 
   it('falls back to a tap when the player hit area overlaps a nearby cell', () => {
@@ -241,7 +299,6 @@ describe('CanvasGestureController', () => {
     'pointercancel',
     'lostpointercapture',
     'blur',
-    'orientationchange',
     'visibilitychange',
   ])('cancels movement and releases captures on %s', (eventType) => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 8, 100, 100));
@@ -282,6 +339,24 @@ describe('CanvasGestureController', () => {
     expect(dispatchTap).not.toHaveBeenCalled();
     expect(onPlayerStep).not.toHaveBeenCalled();
     expect(onPlayerDragEnd).not.toHaveBeenCalled();
+  });
+
+  it('rebases an active mouse pan after viewport and canvas geometry change', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 10, 40, 50, 'mouse'));
+    canvas.dispatchEvent(pointerEvent('pointermove', 10, 72, 77, 'mouse'));
+    expect(beginPan).toHaveBeenCalledTimes(1);
+    expect(panBy).toHaveBeenLastCalledWith({ x: 32, y: 27 });
+
+    canvas.left = 20;
+    canvas.width = 480;
+    viewport = { width: 480, height: 300 };
+    controller.handleViewportResize();
+    expect(beginPan).toHaveBeenCalledTimes(2);
+
+    panBy.mockClear();
+    canvas.dispatchEvent(pointerEvent('pointermove', 10, 82, 87, 'mouse'));
+    expect(panBy).toHaveBeenCalledWith({ x: 10, y: 10 });
+    expect(canvas.captures.has(10)).toBe(true);
   });
 
   it('hands an active mouse pan over to the first touch without shared capture', () => {
