@@ -10,7 +10,7 @@ not through a public issue or pull request.
 
 ## Prerequisites
 
-- Node.js 22.15.0 or newer
+- Node.js 24.0.0 or newer
 - npm 10.0.0 or newer
 - A current desktop browser
 
