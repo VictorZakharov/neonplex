@@ -444,6 +444,9 @@
   .sound-button span { display: none; }
   .sound-button { width: 44px; padding: 0; }
 
+  .topbar button:focus-visible,
+  .topbar a:focus-visible { outline-offset: -3px; }
+
   .game-stage {
     --touch-control-dock: 0px;
     --topbar-left-edge: max(
