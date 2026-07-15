@@ -21,7 +21,6 @@ import {
 import type { EnemyWorld, ParsedLevel } from './internalTypes';
 import { parseLevel } from './levelParser';
 import { MotionTracker } from './MotionTracker';
-import { PlayerStepController } from './PlayerStepController';
 import { EnemySystem } from './systems/EnemySystem';
 import { initializeTiles, isRoundedSupport } from './tileRules';
 import { TravelController } from './TravelController';
@@ -41,7 +40,6 @@ export class GameEngine {
   private elapsedSeconds = 0;
   private tick = 0;
   private movementCooldown = 0;
-  private readonly playerStep = new PlayerStepController();
   private readonly motion = new MotionTracker();
   private gravityAccumulator = 0;
   private enemyAccumulator = 0;
@@ -79,16 +77,9 @@ export class GameEngine {
   public pause(): void {
     if (this.phase === 'playing') {
       this.phase = 'paused';
-      this.cancelPlayerSteps();
       this.travel.clear();
     }
   }
-
-  public queuePlayerStep(direction: Direction): boolean {
-    return this.phase === 'playing' && this.playerStep.accept(direction);
-  }
-
-  public cancelPlayerSteps(): void { this.playerStep.clear(); }
 
   public reset(): void {
     this.tiles = initializeTiles(this.initial.tiles, this.initial.required);
@@ -102,7 +93,6 @@ export class GameEngine {
     this.elapsedSeconds = 0;
     this.tick = 0;
     this.movementCooldown = 0;
-    this.playerStep.clear();
     this.motion.reset();
     this.gravityAccumulator = 0;
     this.enemyAccumulator = 0;
@@ -137,10 +127,9 @@ export class GameEngine {
       this.tryRemoteConsume(input.excavate);
     } else {
       if (input.action) this.deployDisk();
-      const direction = this.playerStep.directionFor(input.direction, travelDirection);
+      const direction = input.direction ?? travelDirection;
       if (direction !== null && this.movementCooldown <= 0) {
         const moved = this.tryMove(direction);
-        this.playerStep.complete(input.direction);
         if (moved) this.travel.completeStep();
         if (moved) this.movementCooldown = MOVE_INTERVAL;
       }

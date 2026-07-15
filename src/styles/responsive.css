@@ -252,8 +252,10 @@
   }
 
   #app[data-input-mode="mouse"] .mobile-controls {
-    visibility: hidden;
-    opacity: 0;
+    /* Keep hybrid controls in hit testing so the first finger contact after
+       mouse use reaches the intended control. Pointerover restores full
+       opacity before pointerdown; the subdued state avoids mouse clutter. */
+    opacity: 0.28;
   }
 
   .virtual-joystick {
@@ -438,25 +440,55 @@
   }
 }
 
-@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 610px),
-  (any-pointer: coarse) and (max-width: 1400px) and (orientation: landscape) and (max-height: 610px) {
+/* Touch landscapes use a shallow status strip and float controls over the board.
+   Do not cap this by height: common 768-800px tablets must reflow when rotated. */
+@media (hover: none) and (pointer: coarse) and (orientation: landscape),
+  (any-pointer: coarse) and (max-width: 1400px) and (orientation: landscape) {
+  .app-shell {
+    grid-template-rows: max(46px, calc(44px + env(safe-area-inset-top))) minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .topbar {
+    min-height: 46px;
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  }
+
+  .brand { gap: 8px; }
+  .brand__mark { width: 30px; height: 30px; }
+  .brand strong { font-size: 15px; }
+  .brand em,
+  .mission-id,
+  .sound-button span { display: none; }
+  .sound-button { width: 44px; padding: 0; }
+
   .game-stage {
-    --touch-control-dock: calc(108px + env(safe-area-inset-bottom));
-    grid-template-columns: clamp(150px, 24vw, 190px) minmax(0, 1fr);
-    grid-template-rows: 56px minmax(0, 1fr);
+    --touch-control-dock: 0px;
+    grid-template-columns: clamp(132px, 21vw, 168px) minmax(0, 1fr);
+    grid-template-rows: 44px minmax(0, 1fr);
     grid-template-areas:
       "mission telemetry"
       "play play";
-    gap: 4px;
+    gap: 2px;
+    padding: 2px;
   }
+
+  .canvas-shell {
+    grid-area: play;
+    width: auto;
+    height: auto;
+  }
+
+  .game-stage:has(.modal:not([hidden])) { grid-template-areas: "play"; }
 
   .hud-rail {
     width: auto;
-    height: 56px;
-    padding: 5px 7px;
+    height: 44px;
+    padding: 3px 5px;
   }
 
   .hud-rail--left {
+    grid-area: mission;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto 3px auto;
@@ -480,7 +512,7 @@
     margin: 0;
   }
 
-  .hud-rail--left .extraction-count strong { font-size: 22px; }
+  .hud-rail--left .extraction-count strong { font-size: 19px; }
   .hud-rail--left .extraction-count span,
   .hud-rail--left .extraction-count em { font-size: 10px; }
 
@@ -517,10 +549,11 @@
   .performance-meter strong { font-size: 12px; }
 
   .hud-rail--right {
+    grid-area: telemetry;
     display: grid;
-    grid-template-columns: minmax(140px, 1.5fr) repeat(3, minmax(72px, 1fr));
+    grid-template-columns: minmax(120px, 1.5fr) repeat(3, minmax(64px, 1fr));
     grid-template-rows: minmax(0, 1fr);
-    gap: 4px;
+    gap: 3px;
   }
 
   .tactical-map {
@@ -538,29 +571,63 @@
   .tactical-map span,
   .tactical-map em { font-size: 8px; }
 
-  .tactical-map canvas { height: 30px; }
+  .tactical-map canvas { height: 22px; }
 
   .telemetry {
     min-width: 0;
     min-height: 0;
     height: 100%;
-    padding: 3px 5px;
+    padding: 2px 4px;
   }
 
   .telemetry span { font-size: 8px; }
-  .telemetry strong { font-size: 13px; }
+  .telemetry strong { font-size: 12px; }
+
+  /* The generic compact label supplies DISKS with a pseudo-element. Reassert
+     its hidden source text after the landscape typography rule to avoid a
+     duplicated "PULSE DISKSDISKS" label. */
+  .telemetry.telemetry--disk > span { font-size: 0; }
+  .telemetry.telemetry--disk > span::after { font-size: 8px; }
+  .signal { display: none; }
+
+  /* The board now occupies the entire play row; controls are transparent
+     overlays instead of reserving a mostly empty full-width dock. */
+  #game-canvas { height: 100%; }
+
+  .mobile-controls {
+    inset: 0;
+    width: auto;
+    height: auto;
+    border: 0;
+    background: transparent;
+  }
+
+  .frame-corner--bl,
+  .frame-corner--br { bottom: 8px; }
 
   .virtual-joystick {
     bottom: max(8px, env(safe-area-inset-bottom));
-    width: 100px;
-    height: 100px;
+    left: max(18px, env(safe-area-inset-left));
+    width: 92px;
+    height: 92px;
   }
 
-  .pulse-control { width: 76px; height: 76px; }
-  .touch-zoom-controls {
-    bottom: max(24px, calc(env(safe-area-inset-bottom) + 18px));
-    left: calc(50% + 12px);
+  .pulse-control {
+    right: max(18px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 68px;
+    height: 68px;
   }
+
+  .pulse-control i { width: 20px; height: 20px; }
+
+  .touch-zoom-controls {
+    bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
+    left: 50%;
+    grid-template-columns: 44px 32px 44px;
+  }
+
+  .touch-zoom-controls button { height: 44px; }
 
   .performance-meter > div:not(:first-child) { display: none; }
 

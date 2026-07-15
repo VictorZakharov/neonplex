@@ -34,7 +34,6 @@ export class InputManager {
   private readonly actionSources = new Set<string>();
   private readonly actionChord = new ActionChordState();
   private virtualJoystick: VirtualJoystick | null = null;
-  private playerStepActive = false;
   private pendingTravelTarget: Point | null | undefined;
   private travelActive = false;
   private restartStartedAt: number | null = null;
@@ -57,6 +56,12 @@ export class InputManager {
       ...options,
       capture: true,
     });
+    // Non-hover touch pointers emit pointerover before pointerdown. Switching
+    // here restores hybrid-tablet controls before the first touch begins.
+    this.root.addEventListener('pointerover', this.onPointerModality, {
+      ...options,
+      capture: true,
+    });
     this.root.addEventListener('pointerdown', this.onPointerDown, options);
     this.root.addEventListener('pointerup', this.onPointerUp, options);
     this.root.addEventListener('pointercancel', this.onPointerUp, options);
@@ -68,6 +73,7 @@ export class InputManager {
         onDirectionChange: (direction) => {
           this.setVirtualDirection('joystick', direction);
         },
+        onViewportInterruption: () => this.interruptActionHold(),
         onUserGesture: this.callbacks.onUserGesture,
       });
       this.virtualJoystick.mount();
@@ -95,8 +101,7 @@ export class InputManager {
   public queueTravelTarget(target: Point): void {
     if (
       this.actionSources.size > 0 ||
-      this.currentDirection() !== null ||
-      this.playerStepActive
+      this.currentDirection() !== null
     ) {
       return;
     }
@@ -108,19 +113,6 @@ export class InputManager {
     if (!this.travelActive && this.pendingTravelTarget === undefined) return;
     this.pendingTravelTarget = null;
     this.travelActive = false;
-  }
-
-  public queuePlayerStep(direction: Direction): boolean {
-    if (this.actionSources.size > 0 || this.currentDirection() !== null) return false;
-    this.cancelTravel();
-    const accepted = this.callbacks.onPlayerStep(direction);
-    this.playerStepActive ||= accepted;
-    return accepted;
-  }
-
-  /** A released or cancelled drag must never leave latent movement behind. */
-  public endPlayerDrag(): void {
-    this.cancelPlayerSteps();
   }
 
   public getRestartHoldProgress(currentTimeMs: number): number | null {
@@ -139,7 +131,6 @@ export class InputManager {
     this.actionSources.clear();
     this.actionChord.clear();
     this.virtualJoystick?.reset();
-    this.cancelPlayerSteps();
     this.cancelTravel();
   }
 
@@ -293,7 +284,6 @@ export class InputManager {
     const previousDirection = this.heldDirectionSources.get(source);
     if (previousDirection === direction) return;
     if (this.actionChord.pressDirection(direction)) this.cancelActionTimer();
-    this.cancelPlayerSteps();
     this.cancelTravel();
     this.heldDirectionSources.set(source, direction);
     const previousIndex = this.directionSourceOrder.indexOf(source);
@@ -316,7 +306,6 @@ export class InputManager {
   private pressActionSource(source: string): void {
     if (this.actionSources.has(source)) return;
     this.cancelTravel();
-    this.cancelPlayerSteps();
     this.actionSources.add(source);
     if (this.actionSources.size === 1) this.beginActionHold();
   }
@@ -329,8 +318,11 @@ export class InputManager {
     this.actionChord.releaseAction();
   }
 
-  private cancelPlayerSteps(): void {
-    this.playerStepActive = false;
-    this.callbacks.onCancelPlayerSteps();
+  /** Prevents a reflow-released joystick from turning Pulse into a deploy hold. */
+  private interruptActionHold(): void {
+    if (this.actionSources.size === 0) return;
+    this.actionSources.clear();
+    this.cancelActionTimer();
+    this.actionChord.clear();
   }
 }

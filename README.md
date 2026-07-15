@@ -25,7 +25,7 @@ Open `http://localhost:8080`.
 
 | Action | Keyboard and mouse | Touch |
 | --- | --- | --- |
-| Move | `WASD` or arrow keys | Drag the virtual joystick, or drag the Carrier along the desired path for precise steps |
+| Move | `WASD` or arrow keys | Drag the virtual joystick, or hold and drag from the Carrier; it moves toward the held finger and stops on release |
 | Travel along a clear straight corridor | - | Tap a reachable cell in the Carrier's row or column |
 | Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction | Hold Pulse + joystick direction |
 | Deploy a collected Pulse Disk beneath the Carrier | Hold `Space` alone for 1.5 seconds | Hold Pulse for 1.5 seconds |
@@ -68,8 +68,9 @@ All three layouts are distinct and selectable from the campaign menu. Local best
 - Carrier moves, Zonk pushes, rolls, falls, Infotron falls, Sentinel translation, and Sentinel rotation animate continuously between cells.
 - Traversal excavation is linear; stationary consumption uses a vortex-like effect matched to the consumed tile.
 - Camera follow, focal-point-preserving wheel zoom, and manual map pan transition smoothly without lateral jumps.
-- Phones and tablets have a continuous analog-style movement joystick, step-accurate Carrier drag steering that survives browser-chrome reflows, clear-corridor tap travel, stabilized midpoint-preserving pinch zoom, large zoom controls, safe-area spacing, and live portrait/landscape reflow.
-- Wide layouts keep the tactical minimap in a dedicated right rail; narrow portrait layouts reserve a compact top HUD dock, while touch landscapes use a shallow horizontal HUD and control dock to maximize the playable board.
+- Phones and tablets have a continuous analog-style movement joystick, queue-free hold-to-follow Carrier steering with immediate release, clear-corridor tap travel, stabilized midpoint-preserving pinch zoom, large zoom controls, safe-area spacing, and live portrait/landscape reflow.
+- Wide layouts keep the tactical minimap in a dedicated right rail; narrow portrait layouts reserve a compact top HUD dock, while phone and tablet landscapes use a shallow horizontal HUD with floating controls so the board receives the available height.
+- Touch surfaces suppress page overscroll, pull-to-refresh, browser swipe navigation where supported, and long-press callouts; controls remain inset from operating-system-reserved screen edges.
 - The responsive textured shell keeps compact extraction status, runtime, score, Disk inventory, minimap, and readable learning and pause screens visible after rotation.
 - Optional, subdued performance telemetry reports FPS, 1% low, frame interval, and render/draw time. It can be shown or hidden persistently from the pause menu.
 - Audio is event-only and has a persistent mute control. There is no music loop or idle hum.
@@ -107,7 +108,7 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 191 deterministic tests across 26 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 180 deterministic tests across 25 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
 | Script | Purpose |
 | --- | --- |

@@ -31,7 +31,7 @@ export const directionFromDisplacement = (
 ): Direction | null => {
   const horizontal = Math.abs(displacement.x);
   const vertical = Math.abs(displacement.y);
-  if (Math.hypot(horizontal, vertical) < deadZone) return null;
+  if (Math.hypot(horizontal, vertical) <= deadZone) return null;
 
   let useHorizontal = horizontal >= vertical;
   if (previousDirection !== null) {
@@ -49,12 +49,15 @@ export const directionFromDisplacement = (
   return displacement.y < 0 ? 'up' : 'down';
 };
 
+export const playerGestureRadius = (tileSize: number): number =>
+  Math.max(28, tileSize * 0.6);
+
 export const isPlayerHit = (
   point: ScreenPoint,
   player: PlayerScreenAnchor | null,
 ): boolean => {
   if (player === null) return false;
-  const radius = Math.max(28, player.tileSize * 0.6);
+  const radius = playerGestureRadius(player.tileSize);
   return Math.hypot(point.x - player.x, point.y - player.y) <= radius;
 };
 

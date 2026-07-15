@@ -24,8 +24,8 @@ export class VirtualJoystick {
     this.element.addEventListener('pointerup', this.onPointerEnd, options);
     this.element.addEventListener('pointercancel', this.onPointerEnd, options);
     this.element.addEventListener('lostpointercapture', this.onPointerEnd, options);
-    window.addEventListener('resize', this.reset, options);
-    window.addEventListener('orientationchange', this.reset, options);
+    window.addEventListener('resize', this.onViewportInterruption, options);
+    window.addEventListener('orientationchange', this.onViewportInterruption, options);
     document.addEventListener('visibilitychange', this.onVisibilityChange, options);
     this.element.dataset.active = 'false';
     this.updateThumb(0, 0);
@@ -76,6 +76,11 @@ export class VirtualJoystick {
 
   private readonly onVisibilityChange = (): void => {
     if (document.hidden) this.reset();
+  };
+
+  private readonly onViewportInterruption = (): void => {
+    if (this.activePointerId !== null) this.callbacks.onViewportInterruption?.();
+    this.reset();
   };
 
   private updateFromPointer(event: PointerEvent): void {

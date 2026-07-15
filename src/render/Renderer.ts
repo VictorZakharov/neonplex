@@ -111,6 +111,10 @@ export class Renderer {
     this.exitIndicator.reset();
   }
 
+  public cancelInteractions(): void {
+    this.camera.cancelInteractions();
+  }
+
   public zoomIn(): void {
     this.camera.zoomIn();
   }

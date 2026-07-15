@@ -1,6 +1,5 @@
 import { GameEngine } from '../game/GameEngine';
 import { Tile, type InputFrame, type LevelDefinition } from '../game/types';
-import { PlayerDragTracker } from '../render/PlayerDragTracker';
 import { InputManager } from './InputManager';
 
 const callbacks = {
@@ -27,11 +26,7 @@ const createHarness = (map: readonly string[]): {
   engine.start();
   return {
     engine,
-    input: new InputManager({} as HTMLElement, {
-      ...callbacks,
-      onPlayerStep: (direction) => engine.queuePlayerStep(direction),
-      onCancelPlayerSteps: () => engine.cancelPlayerSteps(),
-    }),
+    input: new InputManager({} as HTMLElement, callbacks),
   };
 };
 
@@ -83,76 +78,60 @@ describe('mobile travel input bridge', () => {
     expect(engine.getSnapshot().player).toEqual({ x: 4, y: 1 });
   });
 
-  it('lets recent player-drag motion move one cell without running to a wall', () => {
+  it('keeps moving under a stationary player hold and stops on release', () => {
     const { engine, input } = createHarness(['########', '#@    E#', '########']);
-    input.queueTravelTarget({ x: 5, y: 1 });
+    input.setVirtualDirection('player-hold', 'right');
+    update(engine, input, 13);
+
+    expect(engine.getSnapshot().player).toEqual({ x: 4, y: 1 });
+
+    input.setVirtualDirection('player-hold', null);
+    update(engine, input, 24);
+    expect(engine.getSnapshot().player).toEqual({ x: 4, y: 1 });
+  });
+
+  it('uses the latest finger direction without replaying a stale backlog', () => {
+    const { engine, input } = createHarness([
+      '#######',
+      '#@    #',
+      '#    E#',
+      '#######',
+    ]);
+
+    input.setVirtualDirection('player-hold', 'right');
     update(engine, input);
     expect(engine.getSnapshot().player).toEqual({ x: 2, y: 1 });
 
-    const drag = new PlayerDragTracker(
-      (direction) => input.queuePlayerStep(direction),
-      () => input.endPlayerDrag(),
-    );
-    drag.begin({ x: 0, y: 0 }, 30);
-    drag.update({ x: -20, y: 0 });
-    const dragFrame = input.consumeFrame();
-    expect(dragFrame).toEqual({
-      direction: null,
-      action: false,
-      excavate: null,
-      travelTarget: null,
-    });
-    applyFrame(engine, dragFrame);
+    input.setVirtualDirection('player-hold', 'left');
+    input.setVirtualDirection('player-hold', 'up');
+    input.setVirtualDirection('player-hold', 'down');
     update(engine, input, 7);
 
-    expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
-    drag.end();
-    applyFrame(engine, input.consumeFrame());
-    update(engine, input, 24);
-    expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
+    expect(engine.getSnapshot().player).toEqual({ x: 2, y: 2 });
   });
 
-  it('limits a drag burst to the engine two-step queue capacity', () => {
-    const { engine, input } = createHarness([
-      '#######',
-      '#@   E#',
-      '#     #',
-      '#######',
-    ]);
-
-    expect(input.queuePlayerStep('right')).toBe(true);
-    expect(input.queuePlayerStep('down')).toBe(true);
-    expect(input.queuePlayerStep('left')).toBe(false);
-
-    const visited: { x: number; y: number }[] = [];
-    let previous = engine.getSnapshot().player;
-    for (let frame = 0; frame < 30; frame += 1) {
-      update(engine, input);
-      const current = engine.getSnapshot().player;
-      if (current.x !== previous.x || current.y !== previous.y) {
-        visited.push({ ...current });
-        previous = current;
-      }
-    }
-
-    expect(visited).toEqual([
-      { x: 2, y: 1 },
-      { x: 2, y: 2 },
-    ]);
-  });
-
-  it('cancels queued drag motion immediately when the finger is released', () => {
+  it('does not move after a player hold is released during cooldown', () => {
     const { engine, input } = createHarness(['########', '#@    E#', '########']);
 
-    expect(input.queuePlayerStep('right')).toBe(true);
-    expect(input.queuePlayerStep('right')).toBe(true);
-    input.endPlayerDrag();
+    input.setVirtualDirection('player-hold', 'right');
+    update(engine, input);
+    input.setVirtualDirection('player-hold', null);
+    update(engine, input, 30);
+
+    expect(engine.getSnapshot().player).toEqual({ x: 2, y: 1 });
+  });
+
+  it('never moves when the finger releases before the next engine tick', () => {
+    const { engine, input } = createHarness(['########', '#@    E#', '########']);
+
+    input.setVirtualDirection('player-hold', 'right');
+    input.setVirtualDirection('player-hold', null);
     update(engine, input, 30);
 
     expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
   });
 
-  it('attempts the next queued turn immediately after a blocked step', () => {
+  it('applies a new held direction immediately after a blocked attempt', () => {
     const { engine, input } = createHarness([
       '#####',
       '#@#E#',
@@ -160,12 +139,11 @@ describe('mobile travel input bridge', () => {
       '#####',
     ]);
 
-    expect(input.queuePlayerStep('right')).toBe(true);
-    expect(input.queuePlayerStep('down')).toBe(true);
-
+    input.setVirtualDirection('player-hold', 'right');
     update(engine, input);
     expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
 
+    input.setVirtualDirection('player-hold', 'down');
     update(engine, input);
     expect(engine.getSnapshot().player).toEqual({ x: 1, y: 2 });
   });
