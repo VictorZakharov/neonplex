@@ -1,12 +1,25 @@
-import { PLAYER_STEP_QUEUE_CAPACITY } from '../game/playerStepConfig';
-import type { Direction, InputFrame } from '../game/types';
+import type { InputFrame } from '../game/types';
 import type { ActionChordState } from './ActionChordState';
 import { InputManager } from './InputManager';
+
+class FakeInputRoot extends EventTarget {
+  public readonly dataset: Record<string, string> = {};
+
+  public querySelector(): null {
+    return null;
+  }
+}
+
+class FakeInputDocument extends EventTarget {
+  public hidden = false;
+}
 
 const callbacks = {
   onPause: jest.fn(),
   onRestart: jest.fn(),
   onRestartHint: jest.fn(),
+  onPlayerStep: jest.fn(() => true),
+  onCancelPlayerSteps: jest.fn(),
   onUserGesture: jest.fn(),
 };
 
@@ -31,6 +44,49 @@ describe('InputManager virtual input', () => {
 
     manager.setVirtualDirection('joystick', null);
     expect(manager.consumeFrame().direction).toBeNull();
+  });
+
+  it('preserves held input on orientationchange while blur still clears it', () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const fakeWindow = new EventTarget();
+    const fakeDocument = new FakeInputDocument();
+    const manager = new InputManager(
+      new FakeInputRoot() as unknown as HTMLElement,
+      callbacks,
+    );
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: fakeWindow,
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: fakeDocument,
+    });
+
+    try {
+      manager.mount();
+      manager.setVirtualDirection('joystick', 'right');
+
+      fakeWindow.dispatchEvent(new Event('orientationchange'));
+      expect(manager.consumeFrame().direction).toBe('right');
+
+      fakeWindow.dispatchEvent(new Event('blur'));
+      expect(manager.consumeFrame().direction).toBeNull();
+    } finally {
+      manager.dispose();
+      if (originalWindow === undefined) {
+        Reflect.deleteProperty(globalThis, 'window');
+      } else {
+        Object.defineProperty(globalThis, 'window', originalWindow);
+      }
+      if (originalDocument === undefined) {
+        Reflect.deleteProperty(globalThis, 'document');
+      } else {
+        Object.defineProperty(globalThis, 'document', originalDocument);
+      }
+    }
   });
 
   it('resets the action hold and updates its chord when one source changes direction', () => {
@@ -93,58 +149,63 @@ describe('InputManager virtual input', () => {
     expect(manager.consumeFrame()).not.toHaveProperty('travelTarget');
   });
 
-  it('preserves queued finger-follow steps after the drag ends', () => {
+  it('delegates drag backpressure to the authoritative engine queue', () => {
     const manager = createManager();
     manager.queueTravelTarget({ x: 6, y: 4 });
+    callbacks.onPlayerStep
+      .mockReturnValueOnce(true)
+      .mockReturnValueOnce(false);
 
-    manager.queuePlayerStep('left');
-    manager.queuePlayerStep('up');
-    manager.endPlayerDrag();
+    expect(manager.queuePlayerStep('left')).toBe(true);
+    expect(manager.queuePlayerStep('up')).toBe(false);
 
     expect(manager.consumeFrame()).toEqual({
       direction: null,
       action: false,
       excavate: null,
-      stepDirection: 'left',
       travelTarget: null,
     });
+    expect(callbacks.onPlayerStep.mock.calls).toEqual([['left'], ['up']]);
+  });
+
+  it('allows tap travel when the engine rejects the first drag step', () => {
+    const manager = createManager();
+    callbacks.onPlayerStep.mockReturnValueOnce(false);
+
+    expect(manager.queuePlayerStep('right')).toBe(false);
+    manager.queueTravelTarget({ x: 6, y: 4 });
+
     expect(manager.consumeFrame()).toEqual({
       direction: null,
       action: false,
       excavate: null,
-      stepDirection: 'up',
+      travelTarget: { x: 6, y: 4 },
     });
-    expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');
   });
 
-  it('bounds burst input without replacing or reordering accepted steps', () => {
+  it('cancels authoritative engine steps immediately when a drag ends', () => {
     const manager = createManager();
-    const burst = Array.from(
-      { length: PLAYER_STEP_QUEUE_CAPACITY + 3 },
-      (_, index): Direction => (index % 2 === 0 ? 'right' : 'down'),
-    );
-
-    burst.forEach((direction) => manager.queuePlayerStep(direction));
+    manager.queuePlayerStep('right');
+    callbacks.onCancelPlayerSteps.mockClear();
     manager.endPlayerDrag();
 
-    const emitted = burst
-      .map(() => manager.consumeFrame().stepDirection)
-      .filter((direction) => direction !== undefined);
-    expect(emitted).toEqual(burst.slice(0, PLAYER_STEP_QUEUE_CAPACITY));
+    expect(callbacks.onCancelPlayerSteps).toHaveBeenCalledTimes(1);
+    expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');
   });
 
   it('hard-cancels queued finger steps when manual input takes control', () => {
     const manager = createManager();
     manager.queuePlayerStep('left');
     manager.queuePlayerStep('up');
+    callbacks.onCancelPlayerSteps.mockClear();
 
     manager.setVirtualDirection('joystick', 'right');
     expect(manager.consumeFrame()).toEqual({
       direction: 'right',
       action: false,
       excavate: null,
-      stepDirection: null,
     });
+    expect(callbacks.onCancelPlayerSteps).toHaveBeenCalledTimes(1);
 
     manager.setVirtualDirection('joystick', null);
     expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');

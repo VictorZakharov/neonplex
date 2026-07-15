@@ -1,1 +1,1 @@
-export const PLAYER_STEP_QUEUE_CAPACITY = 16;
+export const PLAYER_STEP_QUEUE_CAPACITY = 2;

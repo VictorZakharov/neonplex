@@ -79,10 +79,16 @@ export class GameEngine {
   public pause(): void {
     if (this.phase === 'playing') {
       this.phase = 'paused';
-      this.playerStep.clear();
+      this.cancelPlayerSteps();
       this.travel.clear();
     }
   }
+
+  public queuePlayerStep(direction: Direction): boolean {
+    return this.phase === 'playing' && this.playerStep.accept(direction);
+  }
+
+  public cancelPlayerSteps(): void { this.playerStep.clear(); }
 
   public reset(): void {
     this.tiles = initializeTiles(this.initial.tiles, this.initial.required);
@@ -125,8 +131,6 @@ export class GameEngine {
     this.gravityAccumulator += deltaSeconds;
     this.enemyAccumulator += deltaSeconds;
 
-    if (this.playerStep.accept(input.stepDirection)) this.travel.clear();
-
     const travelDirection = this.travel.directionFor(input);
 
     if (input.excavate !== null) {
@@ -135,10 +139,10 @@ export class GameEngine {
       if (input.action) this.deployDisk();
       const direction = this.playerStep.directionFor(input.direction, travelDirection);
       if (direction !== null && this.movementCooldown <= 0) {
-        this.tryMove(direction);
+        const moved = this.tryMove(direction);
         this.playerStep.complete(input.direction);
-        this.travel.completeStep();
-        this.movementCooldown = MOVE_INTERVAL;
+        if (moved) this.travel.completeStep();
+        if (moved) this.movementCooldown = MOVE_INTERVAL;
       }
     }
 
@@ -201,7 +205,7 @@ export class GameEngine {
     return this.tiles[this.index(x, y)] ?? Tile.Steel;
   }
 
-  private tryMove(direction: Direction): void {
+  private tryMove(direction: Direction): boolean {
     this.facing = direction;
     const vector = DIRECTION_VECTOR[direction];
     const target = { x: this.player.x + vector.x, y: this.player.y + vector.y };
@@ -209,15 +213,14 @@ export class GameEngine {
 
     if (targetTile === Tile.Enemy) {
       this.killPlayer(target);
-      return;
+      return false;
     }
     if (targetTile === Tile.Explosion) {
       this.killPlayer(target, true);
-      return;
+      return false;
     }
     if (targetTile === Tile.Zonk && vector.y === 0) {
-      this.tryPushZonk(target, direction);
-      return;
+      return this.tryPushZonk(target, direction);
     }
     if (
       targetTile === Tile.Steel ||
@@ -227,7 +230,7 @@ export class GameEngine {
       targetTile === Tile.Bomb ||
       targetTile === Tile.ExitClosed
     ) {
-      return;
+      return false;
     }
 
     if (targetTile === Tile.Dirt) {
@@ -245,13 +248,14 @@ export class GameEngine {
       const timeBonus = Math.max(0, this.definition.parSeconds - Math.floor(this.elapsedSeconds)) * 25;
       this.score += 2000 + timeBonus;
       this.emit('win', target, 1.4);
-      return;
+      return true;
     }
 
     this.movePlayer(
       target,
       targetTile === Tile.Dirt ? { position: { ...target }, direction } : null,
     );
+    return true;
   }
 
   private movePlayer(
@@ -319,11 +323,11 @@ export class GameEngine {
     this.emit('disk-pickup', position, 0.8);
   }
 
-  private tryPushZonk(position: Point, direction: Direction): void {
+  private tryPushZonk(position: Point, direction: Direction): boolean {
     const vector = DIRECTION_VECTOR[direction];
     const destination = { x: position.x + vector.x, y: position.y };
     if (this.tileAt(destination.x, destination.y) !== Tile.Empty) {
-      return;
+      return false;
     }
     this.setTile(destination.x, destination.y, Tile.Zonk);
     this.setTile(position.x, position.y, Tile.Empty);
@@ -331,6 +335,7 @@ export class GameEngine {
     this.movePlayer(position);
     this.score += 10;
     this.emit('push', destination, 0.55);
+    return true;
   }
 
   private updateGravity(): void {

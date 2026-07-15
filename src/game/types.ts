@@ -35,7 +35,6 @@ export interface InputFrame {
   readonly direction: Direction | null;
   readonly action: boolean;
   readonly excavate: Direction | null;
-  readonly stepDirection?: Direction | null;
   readonly travelTarget?: Point | null;
 }
 
