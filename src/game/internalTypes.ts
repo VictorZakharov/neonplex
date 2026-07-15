@@ -54,3 +54,9 @@ export interface EnemyWorld {
   killPlayer(position: Point): void;
   emit(type: GameEvent['type'], position: Point, intensity: number): void;
 }
+
+export interface TravelWorld {
+  playerPosition(): Point;
+  tileAt(x: number, y: number): Tile;
+  isInside(x: number, y: number): boolean;
+}

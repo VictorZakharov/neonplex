@@ -35,6 +35,7 @@ export interface InputFrame {
   readonly direction: Direction | null;
   readonly action: boolean;
   readonly excavate: Direction | null;
+  readonly travelTarget?: Point | null;
 }
 
 export type GameEventType =

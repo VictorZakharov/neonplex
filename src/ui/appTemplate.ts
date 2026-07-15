@@ -35,7 +35,7 @@ export const appTemplate = (): string => `
       </section>
 
       <div class="canvas-shell">
-        <canvas id="game-canvas" role="img" aria-label="Neonplex mining grid. Use arrow keys or WASD to move."></canvas>
+        <canvas id="game-canvas" role="img" aria-label="Neonplex mining grid. Move with WASD, arrow keys, the touch joystick, or by dragging from the Carrier. Tap a clear straight route to travel and pinch or use the zoom controls to change magnification."></canvas>
         <div class="frame-corner frame-corner--tl"></div><div class="frame-corner frame-corner--tr"></div>
         <div class="frame-corner frame-corner--bl"></div><div class="frame-corner frame-corner--br"></div>
         <div id="briefing" class="briefing" data-visible="false"></div>
@@ -51,14 +51,31 @@ export const appTemplate = (): string => `
             <circle class="action-feedback__track" cx="22" cy="22" r="18"></circle>
             <circle class="action-feedback__progress" cx="22" cy="22" r="18" pathLength="100"></circle>
           </svg>
-          <span>HOLD SPACE · DEPLOY HERE</span>
+          <span>HOLD TO DEPLOY HERE</span>
         </div>
         <div id="modal" class="modal" data-visible="false"><div id="modal-content"></div></div>
+        <div class="mobile-controls" role="group" aria-label="Touch controls">
+          <div class="virtual-joystick" data-joystick role="group" tabindex="0" aria-label="Movement joystick. Drag in any direction to move the Carrier.">
+            <span class="virtual-joystick__ring" aria-hidden="true">
+              <i class="virtual-joystick__direction virtual-joystick__direction--up"></i>
+              <i class="virtual-joystick__direction virtual-joystick__direction--right"></i>
+              <i class="virtual-joystick__direction virtual-joystick__direction--down"></i>
+              <i class="virtual-joystick__direction virtual-joystick__direction--left"></i>
+              <b class="virtual-joystick__thumb"></b>
+            </span>
+          </div>
+          <div class="touch-zoom-controls" aria-label="Map zoom controls">
+            <button data-ui="zoom-out" type="button" aria-label="Zoom out">&minus;</button>
+            <output id="touch-zoom-label" data-zoom-prefix="" aria-label="Current map zoom">100%</output>
+            <button data-ui="zoom-in" type="button" aria-label="Zoom in">+</button>
+          </div>
+          <button class="pulse-control" data-input="action" type="button" aria-label="Hold for 1.5 seconds to deploy pulse disk beneath carrier"><i></i><span>PULSE</span></button>
+        </div>
       </div>
 
       <section class="hud-rail hud-rail--right" aria-label="Telemetry">
         <div class="tactical-map">
-          <div><span>TACTICAL MAP</span><em id="minimap-zoom">OPTICS 100%</em></div>
+          <div><span>TACTICAL MAP</span><em id="minimap-zoom" data-zoom-prefix="OPTICS">OPTICS 100%</em></div>
           <canvas id="minimap-canvas" role="img" aria-label="Tactical map showing the level, current viewport, and player position"></canvas>
         </div>
         <div class="telemetry"><span>RUNTIME</span><strong id="hud-time">00:00</strong></div>
@@ -67,16 +84,6 @@ export const appTemplate = (): string => `
         <div class="signal"><span>LINK STABILITY</span><i><b></b><b></b><b></b><b></b><b></b></i><em>OPTIMAL</em></div>
       </section>
     </main>
-
-    <div class="mobile-controls" aria-label="Touch controls">
-      <div class="dpad">
-        <button data-input="up" type="button" aria-label="Move up">▲</button>
-        <button data-input="left" type="button" aria-label="Move left">◀</button>
-        <button data-input="down" type="button" aria-label="Move down">▼</button>
-        <button data-input="right" type="button" aria-label="Move right">▶</button>
-      </div>
-      <button class="pulse-control" data-input="action" type="button" aria-label="Hold for 1.5 seconds to deploy pulse disk beneath carrier"><i></i><span>PULSE</span></button>
-    </div>
 
     <footer class="footerbar">
       <div><span class="status-dot"></span> NETWORK LINK <strong>SECURE</strong></div>

@@ -4,11 +4,20 @@ import { CameraController } from './CameraController';
 import { ExitIndicatorRenderer } from './ExitIndicatorRenderer';
 import { IntelPreviewRenderer } from './IntelPreviewRenderer';
 import { MinimapRenderer } from './MinimapRenderer';
-import type { IntelPreviewKind, PlayerScreenAnchor, Viewport } from './renderTypes';
+import type {
+  CameraInteractionCallbacks,
+  IntelPreviewKind,
+  PlayerScreenAnchor,
+  Viewport,
+} from './renderTypes';
 import { ScreenEffectsRenderer } from './ScreenEffectsRenderer';
 import { TilePainter } from './TilePainter';
 
-export type { IntelPreviewKind, PlayerScreenAnchor } from './renderTypes';
+export type {
+  CameraInteractionCallbacks,
+  IntelPreviewKind,
+  PlayerScreenAnchor,
+} from './renderTypes';
 
 /** Coordinates the render pipeline; specialized modules own each visual concern. */
 export class Renderer {
@@ -30,12 +39,21 @@ export class Renderer {
   public constructor(
     private readonly canvas: HTMLCanvasElement,
     minimapCanvas: HTMLCanvasElement,
-    zoomLabel: HTMLElement,
+    zoomLabels: HTMLElement | readonly HTMLElement[],
+    interactions: CameraInteractionCallbacks = {},
   ) {
     const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
     if (context === null) throw new Error('Canvas 2D is unavailable in this browser.');
     this.context = context;
-    this.camera = new CameraController(canvas, zoomLabel, this.reducedMotion);
+    const synchronizedZoomLabels: readonly HTMLElement[] = Array.isArray(zoomLabels)
+      ? zoomLabels
+      : [zoomLabels as HTMLElement];
+    this.camera = new CameraController(
+      canvas,
+      synchronizedZoomLabels,
+      this.reducedMotion,
+      interactions,
+    );
     this.minimap = new MinimapRenderer(minimapCanvas);
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(canvas);
@@ -88,6 +106,14 @@ export class Renderer {
     this.exitIndicator.reset();
   }
 
+  public zoomIn(): void {
+    this.camera.zoomIn();
+  }
+
+  public zoomOut(): void {
+    this.camera.zoomOut();
+  }
+
   public getPlayerScreenAnchor(): PlayerScreenAnchor | null {
     return this.camera.getPlayerScreenAnchor();
   }
@@ -115,6 +141,7 @@ export class Renderer {
       this.tiles.clearCache();
     }
     const viewport = this.viewport();
+    this.camera.handleViewportResize(viewport);
     this.effects.resize(viewport, dpr);
     this.minimap.resize(dpr);
   }

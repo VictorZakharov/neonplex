@@ -11,7 +11,7 @@
   --danger: #ff526f;
   --panel: rgba(5, 13, 23, 0.82);
   --line: rgba(104, 224, 255, 0.19);
-  --hud-surface: url("../assets/neon-hud-surface.png");
+  --hud-surface: url("../assets/neon-hud-surface.jpg");
   --mono: "IBM Plex Mono", "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   --display: "Arial Narrow", "Bahnschrift Condensed", "Roboto Condensed", sans-serif;
 }
@@ -27,6 +27,12 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+}
+
+html,
+body {
+  min-height: 100%;
+  min-height: 100dvh;
 }
 
 body {
@@ -59,6 +65,7 @@ a:focus-visible {
   grid-template-rows: 72px minmax(0, 1fr) 36px;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   min-height: 480px;
   overflow: hidden;
   background:

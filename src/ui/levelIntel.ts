@@ -13,6 +13,11 @@ export const LEVEL_INTEL: readonly LevelIntel[] = [
         description: 'Your orange remote body. Hold Space plus a direction to consume adjacent soil, Infotrons, or pickup Disks without moving.',
       },
       {
+        icon: 'touch',
+        name: 'Touch Interface',
+        description: 'On touch screens, steer with the joystick or drag outward from the Carrier. Tap a clear cell in the same row or column to travel there; drag the grid to pan and pinch to zoom.',
+      },
+      {
         icon: 'infotron',
         name: 'Infotron',
         description: 'Bright cyan objective. Move into it or use Space plus a direction to collect it; secure every one to bring the exit online.',
@@ -69,7 +74,7 @@ export const LEVEL_INTEL: readonly LevelIntel[] = [
       {
         icon: 'map',
         name: 'Tactical Optics',
-        description: 'Use the wheel to zoom and drag with either mouse button to pan. Moving the Carrier smoothly restores camera follow.',
+        description: 'Use the wheel or touch zoom controls to magnify, pinch around a point, and drag the map with a mouse button or one finger. Moving the Carrier smoothly restores camera follow.',
       },
     ],
   },

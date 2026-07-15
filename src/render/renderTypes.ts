@@ -1,4 +1,4 @@
-import type { Tile } from '../game/types';
+import type { Direction, Point, Tile } from '../game/types';
 
 export interface Viewport {
   readonly width: number;
@@ -45,6 +45,67 @@ export interface ScreenPoint {
   readonly x: number;
   readonly y: number;
 }
+
+export interface CameraInteractionCallbacks {
+  readonly onPlayerDirection?: (direction: Direction | null) => void;
+  readonly onTravelTarget?: (target: Point) => void;
+  readonly onCancelTravel?: () => void;
+  readonly onUserGesture?: () => void;
+}
+
+export interface PinchGestureUpdate {
+  readonly previousCentroid: ScreenPoint;
+  readonly nextCentroid: ScreenPoint;
+  readonly previousDistance: number;
+  readonly nextDistance: number;
+}
+
+export interface CanvasGestureHost {
+  readonly getViewport: () => Viewport;
+  readonly getPlayerScreenAnchor: () => PlayerScreenAnchor | null;
+  readonly beginPan: () => void;
+  readonly panBy: (displacement: ScreenPoint) => void;
+  readonly applyPinch: (update: PinchGestureUpdate) => void;
+  readonly dispatchTap: (point: ScreenPoint) => void;
+  readonly zoomFromWheel: (zoomIn: boolean, focalPoint: ScreenPoint) => void;
+}
+
+export interface PinchCameraInput {
+  readonly cameraLeft: number;
+  readonly cameraTop: number;
+  readonly previousCentroid: ScreenPoint;
+  readonly nextCentroid: ScreenPoint;
+  readonly previousDistance: number;
+  readonly nextDistance: number;
+  readonly baseTileSize: number;
+  readonly zoom: number;
+  readonly minimumZoom: number;
+  readonly maximumZoom: number;
+  readonly boardWidth: number;
+  readonly boardHeight: number;
+  readonly viewport: Viewport;
+  readonly padding: number;
+}
+
+export interface CameraTransform {
+  readonly left: number;
+  readonly top: number;
+  readonly zoom: number;
+}
+
+export interface ViewportCenterCameraInput {
+  readonly cameraLeft: number;
+  readonly cameraTop: number;
+  readonly previousViewport: Viewport;
+  readonly nextViewport: Viewport;
+  readonly previousTileSize: number;
+  readonly nextTileSize: number;
+  readonly boardWidth: number;
+  readonly boardHeight: number;
+  readonly padding: number;
+}
+
+export type TouchGestureMode = 'idle' | 'tap' | 'pan' | 'player' | 'pinch';
 
 export interface EdgeIndicator {
   readonly position: ScreenPoint;
@@ -98,6 +159,7 @@ export type IntelPreviewKind =
   | 'exit'
   | 'enemy'
   | 'disk'
+  | 'touch'
   | 'map'
   | 'cascade'
   | 'chain';
