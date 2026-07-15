@@ -4,13 +4,12 @@ export interface InputCallbacks {
   readonly onPause: () => void;
   readonly onRestart: () => void;
   readonly onRestartHint: () => void;
-  readonly onPlayerStep: (direction: Direction) => boolean;
-  readonly onCancelPlayerSteps: () => void;
   readonly onUserGesture: () => void;
 }
 
 export interface VirtualJoystickCallbacks {
   readonly onDirectionChange: (direction: Direction | null) => void;
+  readonly onViewportInterruption?: () => void;
   readonly onUserGesture: () => void;
 }
 

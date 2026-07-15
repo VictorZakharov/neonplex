@@ -35,7 +35,7 @@ export const appTemplate = (): string => `
       </section>
 
       <div class="canvas-shell">
-        <canvas id="game-canvas" role="img" aria-label="Neonplex mining grid. Move with WASD, arrow keys, the touch joystick, or by dragging from the Carrier. Tap a clear straight route to travel and pinch or use the zoom controls to change magnification."></canvas>
+        <canvas id="game-canvas" role="img" aria-label="Neonplex mining grid. Move with WASD, arrow keys, the touch joystick, or by holding and dragging from the Carrier; release to stop. Tap a clear straight route to travel and pinch or use the zoom controls to change magnification."></canvas>
         <div class="frame-corner frame-corner--tl"></div><div class="frame-corner frame-corner--tr"></div>
         <div class="frame-corner frame-corner--bl"></div><div class="frame-corner frame-corner--br"></div>
         <div id="briefing" class="briefing" data-visible="false"></div>

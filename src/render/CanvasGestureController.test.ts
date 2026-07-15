@@ -78,10 +78,10 @@ describe('CanvasGestureController', () => {
   let applyPinch: jest.Mock<void, [PinchGestureUpdate]>;
   let dispatchTap: jest.Mock<void, [ScreenPoint]>;
   let zoomFromWheel: jest.Mock<void, [boolean, ScreenPoint]>;
-  let onPlayerStep: jest.Mock<boolean, [Direction]>;
-  let onPlayerDragEnd: jest.Mock<void, []>;
+  let onPlayerDirection: jest.Mock<void, [Direction | null]>;
   let onCancelTravel: jest.Mock<void, []>;
   let onUserGesture: jest.Mock<void, []>;
+  let playerAnchor: { x: number; y: number; tileSize: number };
   let controller: CanvasGestureController;
 
   beforeEach(() => {
@@ -94,10 +94,10 @@ describe('CanvasGestureController', () => {
     applyPinch = jest.fn();
     dispatchTap = jest.fn();
     zoomFromWheel = jest.fn();
-    onPlayerStep = jest.fn<boolean, [Direction]>(() => true);
-    onPlayerDragEnd = jest.fn();
+    onPlayerDirection = jest.fn();
     onCancelTravel = jest.fn();
     onUserGesture = jest.fn();
+    playerAnchor = { x: 100, y: 100, tileSize: 30 };
 
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -110,7 +110,7 @@ describe('CanvasGestureController', () => {
 
     const host: CanvasGestureHost = {
       getViewport: () => viewport,
-      getPlayerScreenAnchor: () => ({ x: 100, y: 100, tileSize: 30 }),
+      getPlayerScreenAnchor: () => playerAnchor,
       beginPan,
       panBy,
       applyPinch,
@@ -118,8 +118,7 @@ describe('CanvasGestureController', () => {
       zoomFromWheel,
     };
     const interactions: CameraInteractionCallbacks = {
-      onPlayerStep,
-      onPlayerDragEnd,
+      onPlayerDirection,
       onCancelTravel,
       onUserGesture,
     };
@@ -177,44 +176,63 @@ describe('CanvasGestureController', () => {
     expect(canvas.captures.has(20)).toBe(true);
   });
 
-  it('steps only while the finger keeps advancing', () => {
-    canvas.dispatchEvent(pointerEvent('pointerdown', 3, 127, 100));
-    canvas.dispatchEvent(pointerEvent('pointermove', 3, 165, 100));
+  it('holds one direction while the finger is stationary and clears it on release', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 3, 100, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 3, 140, 100));
 
-    expect(onPlayerStep).toHaveBeenCalledWith('right');
+    expect(onPlayerDirection).toHaveBeenCalledWith('right');
     expect(canvas.captures.has(3)).toBe(true);
 
-    canvas.dispatchEvent(pointerEvent('pointermove', 3, 165, 100));
-    expect(onPlayerStep).toHaveBeenCalledTimes(1);
+    controller.updatePlayerHold();
+    controller.updatePlayerHold();
+    expect(onPlayerDirection).toHaveBeenCalledTimes(1);
 
-    canvas.dispatchEvent(pointerEvent('pointermove', 3, 183, 100));
-    expect(onPlayerStep).toHaveBeenLastCalledWith('right');
-    expect(onPlayerStep).toHaveBeenCalledTimes(2);
+    canvas.dispatchEvent(pointerEvent('pointerup', 3, 140, 100));
 
-    canvas.dispatchEvent(pointerEvent('pointerup', 3, 183, 100));
-
-    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+      null,
+    ]);
     expect(canvas.captures.has(3)).toBe(false);
     expect(canvas.dataset.panning).toBe('false');
     expect(dispatchTap).not.toHaveBeenCalled();
   });
 
-  it('steers from recent finger motion instead of the original touch point', () => {
+  it('applies fast direction changes immediately without queuing old motion', () => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 31, 100, 100));
-    canvas.dispatchEvent(pointerEvent('pointermove', 31, 130, 100));
-    canvas.dispatchEvent(pointerEvent('pointermove', 31, 100, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 31, 170, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 31, 100, 170));
+    canvas.dispatchEvent(pointerEvent('pointermove', 31, 30, 100));
 
-    expect(onPlayerStep.mock.calls.map(([direction]) => direction)).toEqual([
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
       'right',
+      'down',
       'left',
     ]);
-    expect(onPlayerDragEnd).not.toHaveBeenCalled();
+  });
+
+  it('stops in the player dead zone as the Carrier catches the finger', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 34, 100, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 34, 140, 100));
+    playerAnchor = { x: 120, y: 100, tileSize: 30 };
+
+    controller.updatePlayerHold();
+
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+      null,
+    ]);
+
+    canvas.dispatchEvent(pointerEvent('pointerup', 34, 140, 100));
+    expect(dispatchTap).not.toHaveBeenCalled();
   });
 
   it('preserves a captured player drag across a mobile viewport reflow', () => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 32, 100, 100));
-    canvas.dispatchEvent(pointerEvent('pointermove', 32, 130, 100));
-    expect(onPlayerStep.mock.calls.map(([direction]) => direction)).toEqual(['right']);
+    canvas.dispatchEvent(pointerEvent('pointermove', 32, 140, 100));
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+    ]);
 
     canvas.top = 20;
     canvas.height = 280;
@@ -222,37 +240,33 @@ describe('CanvasGestureController', () => {
     controller.handleViewportResize();
     canvas.dispatchEvent(pointerEvent('pointermove', 32, 160, 100));
 
-    expect(onPlayerStep.mock.calls.map(([direction]) => direction)).toEqual([
-      'right',
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
       'right',
     ]);
-    expect(onPlayerDragEnd).not.toHaveBeenCalled();
     expect(canvas.captures.has(32)).toBe(true);
   });
 
   it('does not cancel a captured player drag on orientationchange alone', () => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 33, 100, 100));
     canvas.dispatchEvent(pointerEvent('pointermove', 33, 130, 100));
-    onPlayerDragEnd.mockClear();
     onCancelTravel.mockClear();
 
     fakeWindow.dispatchEvent(new Event('orientationchange'));
 
-    expect(onPlayerDragEnd).not.toHaveBeenCalled();
+    expect(onPlayerDirection).toHaveBeenLastCalledWith('right');
     expect(onCancelTravel).not.toHaveBeenCalled();
     expect(canvas.captures.has(33)).toBe(true);
 
     canvas.dispatchEvent(pointerEvent('pointerup', 33, 130, 100));
-    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
+    expect(onPlayerDirection).toHaveBeenLastCalledWith(null);
   });
 
   it('falls back to a tap when the player hit area overlaps a nearby cell', () => {
-    canvas.dispatchEvent(pointerEvent('pointerdown', 30, 127, 100));
-    canvas.dispatchEvent(pointerEvent('pointerup', 30, 127, 100));
+    canvas.dispatchEvent(pointerEvent('pointerdown', 30, 128, 100));
+    canvas.dispatchEvent(pointerEvent('pointerup', 30, 128, 100));
 
-    expect(onPlayerStep).not.toHaveBeenCalled();
-    expect(onPlayerDragEnd).not.toHaveBeenCalled();
-    expect(dispatchTap).toHaveBeenCalledWith({ x: 127, y: 100 });
+    expect(onPlayerDirection).not.toHaveBeenCalled();
+    expect(dispatchTap).toHaveBeenCalledWith({ x: 128, y: 100 });
   });
 
   it('cancels player movement when a second touch arrives and gives pinch priority', () => {
@@ -260,8 +274,10 @@ describe('CanvasGestureController', () => {
     canvas.dispatchEvent(pointerEvent('pointermove', 4, 130, 100));
     canvas.dispatchEvent(pointerEvent('pointerdown', 5, 200, 100));
 
-    expect(onPlayerStep).toHaveBeenCalledWith('right');
-    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+      null,
+    ]);
 
     canvas.dispatchEvent(pointerEvent('pointermove', 5, 230, 100));
 
@@ -272,7 +288,7 @@ describe('CanvasGestureController', () => {
       previousDistance: 70,
       nextDistance: 100,
     });
-    expect(onPlayerStep).toHaveBeenCalledTimes(1);
+    expect(onPlayerDirection).toHaveBeenCalledTimes(2);
     expect(dispatchTap).not.toHaveBeenCalled();
   });
 
@@ -314,8 +330,10 @@ describe('CanvasGestureController', () => {
       fakeWindow.dispatchEvent(new Event(eventType));
     }
 
-    expect(onPlayerStep).toHaveBeenCalledWith('right');
-    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
+    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+      null,
+    ]);
     expect(onCancelTravel).toHaveBeenCalledTimes(1);
     expect(canvas.captures.size).toBe(0);
     expect(canvas.dataset.panning).toBe('false');
@@ -337,8 +355,7 @@ describe('CanvasGestureController', () => {
     expect(canvas.captures.has(9)).toBe(false);
     expect(canvas.dataset.panning).toBe('false');
     expect(dispatchTap).not.toHaveBeenCalled();
-    expect(onPlayerStep).not.toHaveBeenCalled();
-    expect(onPlayerDragEnd).not.toHaveBeenCalled();
+    expect(onPlayerDirection).not.toHaveBeenCalled();
   });
 
   it('rebases an active mouse pan after viewport and canvas geometry change', () => {

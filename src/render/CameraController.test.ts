@@ -1,6 +1,6 @@
 import type { GameSnapshot } from '../game/types';
 import { CameraController } from './CameraController';
-import type { Viewport } from './renderTypes';
+import type { CameraInteractionCallbacks, Viewport } from './renderTypes';
 
 class FakeCameraCanvas extends EventTarget {
   public readonly captures = new Set<number>();
@@ -48,6 +48,7 @@ const pointerEvent = (
   pointerId: number,
   clientX: number,
   clientY: number,
+  pointerType: 'mouse' | 'touch' = 'mouse',
 ): PointerEvent => {
   const event = new Event(type, { cancelable: true });
   Object.defineProperties(event, {
@@ -55,7 +56,7 @@ const pointerEvent = (
     clientX: { value: clientX },
     clientY: { value: clientY },
     pointerId: { value: pointerId },
-    pointerType: { value: 'mouse' },
+    pointerType: { value: pointerType },
   });
   return event as PointerEvent;
 };
@@ -89,6 +90,7 @@ describe('CameraController viewport gesture integration', () => {
   const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
   let canvas: FakeCameraCanvas;
   let camera: CameraController;
+  let interactions: CameraInteractionCallbacks;
 
   beforeEach(() => {
     Object.defineProperty(globalThis, 'window', {
@@ -100,11 +102,12 @@ describe('CameraController viewport gesture integration', () => {
       value: new FakeCameraDocument(),
     });
     canvas = new FakeCameraCanvas();
+    interactions = { onPlayerDirection: jest.fn() };
     camera = new CameraController(
       canvas as unknown as HTMLCanvasElement,
       [],
       { matches: true } as unknown as MediaQueryList,
-      {},
+      interactions,
     );
   });
 
@@ -151,5 +154,66 @@ describe('CameraController viewport gesture integration', () => {
 
     expect(Reflect.get(camera, 'cameraLeft')).toBeCloseTo(preservedLeft + 10, 10);
     expect(canvas.captures.has(1)).toBe(true);
+  });
+
+  it('re-evaluates a stationary held finger after the player anchor moves', () => {
+    const viewport = { width: 400, height: 300 };
+    const initial = {
+      ...SNAPSHOT,
+      width: 5,
+      height: 3,
+      player: { x: 1, y: 1 },
+      previousPlayer: { x: 1, y: 1 },
+    };
+    camera.handleViewportResize(viewport);
+    camera.layoutFor(initial, 0, 0, viewport);
+    const anchor = camera.getPlayerScreenAnchor();
+    expect(anchor).not.toBeNull();
+    if (anchor === null) return;
+
+    canvas.dispatchEvent(pointerEvent('pointerdown', 2, anchor.x, anchor.y, 'touch'));
+    canvas.dispatchEvent(
+      pointerEvent('pointermove', 2, anchor.x + 40, anchor.y, 'touch'),
+    );
+    expect(interactions.onPlayerDirection).toHaveBeenLastCalledWith('right');
+
+    camera.layoutFor(
+      {
+        ...initial,
+        player: { x: 2, y: 1 },
+        previousPlayer: { x: 2, y: 1 },
+      },
+      0,
+      0,
+      viewport,
+    );
+
+    expect(interactions.onPlayerDirection).toHaveBeenLastCalledWith(null);
+  });
+
+  it('cancels an active player hold before a modal can clear input state', () => {
+    const viewport = { width: 400, height: 300 };
+    camera.handleViewportResize(viewport);
+    camera.layoutFor(SNAPSHOT, 0, 0, viewport);
+    const anchor = camera.getPlayerScreenAnchor();
+    expect(anchor).not.toBeNull();
+    if (anchor === null) return;
+
+    canvas.dispatchEvent(pointerEvent('pointerdown', 3, anchor.x, anchor.y, 'touch'));
+    canvas.dispatchEvent(
+      pointerEvent('pointermove', 3, anchor.x + 40, anchor.y, 'touch'),
+    );
+    expect(interactions.onPlayerDirection).toHaveBeenLastCalledWith('right');
+
+    camera.cancelInteractions();
+
+    expect(interactions.onPlayerDirection).toHaveBeenLastCalledWith(null);
+    expect(canvas.captures.has(3)).toBe(false);
+
+    canvas.dispatchEvent(pointerEvent('pointerdown', 4, anchor.x, anchor.y, 'touch'));
+    canvas.dispatchEvent(
+      pointerEvent('pointermove', 4, anchor.x + 40, anchor.y, 'touch'),
+    );
+    expect(interactions.onPlayerDirection).toHaveBeenLastCalledWith('right');
   });
 });

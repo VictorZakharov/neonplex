@@ -18,8 +18,6 @@ const callbacks = {
   onPause: jest.fn(),
   onRestart: jest.fn(),
   onRestartHint: jest.fn(),
-  onPlayerStep: jest.fn(() => true),
-  onCancelPlayerSteps: jest.fn(),
   onUserGesture: jest.fn(),
 };
 
@@ -44,6 +42,46 @@ describe('InputManager virtual input', () => {
 
     manager.setVirtualDirection('joystick', null);
     expect(manager.consumeFrame().direction).toBeNull();
+  });
+
+  it('switches a hybrid layout back to touch before the first pointerdown', () => {
+    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    const fakeWindow = new EventTarget();
+    const fakeDocument = new FakeInputDocument();
+    const root = new FakeInputRoot();
+    const manager = new InputManager(root as unknown as HTMLElement, callbacks);
+    const touchOver = new Event('pointerover');
+    Object.defineProperty(touchOver, 'pointerType', { value: 'touch' });
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: fakeWindow,
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: fakeDocument,
+    });
+
+    try {
+      root.dataset.inputMode = 'mouse';
+      manager.mount();
+      root.dispatchEvent(touchOver);
+
+      expect(root.dataset.inputMode).toBe('touch');
+    } finally {
+      manager.dispose();
+      if (originalWindow === undefined) {
+        Reflect.deleteProperty(globalThis, 'window');
+      } else {
+        Object.defineProperty(globalThis, 'window', originalWindow);
+      }
+      if (originalDocument === undefined) {
+        Reflect.deleteProperty(globalThis, 'document');
+      } else {
+        Object.defineProperty(globalThis, 'document', originalDocument);
+      }
+    }
   });
 
   it('preserves held input on orientationchange while blur still clears it', () => {
@@ -103,6 +141,19 @@ describe('InputManager virtual input', () => {
     expect(manager.consumeFrame().excavate).toBe('down');
   });
 
+  it('cancels Pulse when a viewport reflow interrupts an active joystick', () => {
+    const manager = createManager();
+    const chord = Reflect.get(manager, 'actionChord') as ActionChordState;
+    chord.pressAction(null, 1_000);
+    (Reflect.get(manager, 'actionSources') as Set<string>).add('touch:pulse');
+
+    const interruptActionHold = Reflect.get(manager, 'interruptActionHold') as () => void;
+    interruptActionHold.call(manager);
+
+    expect(chord.getDeploymentHoldProgress(3_000)).toBeNull();
+    expect(Reflect.get(manager, 'actionSources')).toHaveProperty('size', 0);
+  });
+
   it('restores the previous held source when the newest source releases', () => {
     const manager = createManager();
 
@@ -149,66 +200,31 @@ describe('InputManager virtual input', () => {
     expect(manager.consumeFrame()).not.toHaveProperty('travelTarget');
   });
 
-  it('delegates drag backpressure to the authoritative engine queue', () => {
+  it('repeats a stationary player hold without a gesture step queue', () => {
     const manager = createManager();
     manager.queueTravelTarget({ x: 6, y: 4 });
-    callbacks.onPlayerStep
-      .mockReturnValueOnce(true)
-      .mockReturnValueOnce(false);
+    manager.setVirtualDirection('player-hold', 'right');
 
-    expect(manager.queuePlayerStep('left')).toBe(true);
-    expect(manager.queuePlayerStep('up')).toBe(false);
-
-    expect(manager.consumeFrame()).toEqual({
-      direction: null,
+    const frames = Array.from({ length: 12 }, () => manager.consumeFrame());
+    expect(frames.every((frame) => frame.direction === 'right')).toBe(true);
+    expect(frames[0]).toEqual({
+      direction: 'right',
       action: false,
       excavate: null,
       travelTarget: null,
     });
-    expect(callbacks.onPlayerStep.mock.calls).toEqual([['left'], ['up']]);
   });
 
-  it('allows tap travel when the engine rejects the first drag step', () => {
+  it('changes a held player direction immediately and stops on release', () => {
     const manager = createManager();
-    callbacks.onPlayerStep.mockReturnValueOnce(false);
+    manager.setVirtualDirection('player-hold', 'right');
+    expect(manager.consumeFrame().direction).toBe('right');
 
-    expect(manager.queuePlayerStep('right')).toBe(false);
-    manager.queueTravelTarget({ x: 6, y: 4 });
+    manager.setVirtualDirection('player-hold', 'up');
+    expect(manager.consumeFrame().direction).toBe('up');
 
-    expect(manager.consumeFrame()).toEqual({
-      direction: null,
-      action: false,
-      excavate: null,
-      travelTarget: { x: 6, y: 4 },
-    });
-  });
-
-  it('cancels authoritative engine steps immediately when a drag ends', () => {
-    const manager = createManager();
-    manager.queuePlayerStep('right');
-    callbacks.onCancelPlayerSteps.mockClear();
-    manager.endPlayerDrag();
-
-    expect(callbacks.onCancelPlayerSteps).toHaveBeenCalledTimes(1);
-    expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');
-  });
-
-  it('hard-cancels queued finger steps when manual input takes control', () => {
-    const manager = createManager();
-    manager.queuePlayerStep('left');
-    manager.queuePlayerStep('up');
-    callbacks.onCancelPlayerSteps.mockClear();
-
-    manager.setVirtualDirection('joystick', 'right');
-    expect(manager.consumeFrame()).toEqual({
-      direction: 'right',
-      action: false,
-      excavate: null,
-    });
-    expect(callbacks.onCancelPlayerSteps).toHaveBeenCalledTimes(1);
-
-    manager.setVirtualDirection('joystick', null);
-    expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');
+    manager.setVirtualDirection('player-hold', null);
+    expect(manager.consumeFrame().direction).toBeNull();
   });
 
   it('replaces queued travel with cancellation when manual input arrives', () => {

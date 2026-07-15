@@ -86,8 +86,12 @@ export class CameraController {
     this.gestures.dispose();
   }
 
-  public reset(): void {
+  public cancelInteractions(): void {
     this.gestures.cancel(true);
+  }
+
+  public reset(): void {
+    this.cancelInteractions();
     this.cameraReady = false;
     this.lastSnapshot = null;
     this.lastLayout = null;
@@ -242,6 +246,7 @@ export class CameraController {
       y: this.cameraTop + focusY * tile,
       tileSize: tile,
     };
+    this.gestures.updatePlayerHold();
     const layout = {
       tile,
       width,

@@ -92,15 +92,14 @@ export class App {
       onPause: () => this.togglePause(),
       onRestart: () => this.restart(),
       onRestartHint: () => this.showRestartHint(),
-      onPlayerStep: (direction) => this.engine?.queuePlayerStep(direction) ?? false,
-      onCancelPlayerSteps: () => this.engine?.cancelPlayerSteps(),
       onUserGesture: () => {
         void this.audio.activate().catch(() => undefined);
       },
     });
     this.renderer = new Renderer(canvas, minimapCanvas, [minimapZoom, touchZoom], {
-      onPlayerStep: (direction) => this.input?.queuePlayerStep(direction) ?? false,
-      onPlayerDragEnd: () => this.input?.endPlayerDrag(),
+      onPlayerDirection: (direction) => {
+        this.input?.setVirtualDirection('player-hold', direction);
+      },
       onTravelTarget: (target) => this.input?.queueTravelTarget(target),
       onCancelTravel: () => this.input?.cancelTravel(),
       onUserGesture: () => {
@@ -390,6 +389,7 @@ export class App {
 
   private showModal(): void {
     if (this.modal === null) return;
+    this.renderer?.cancelInteractions();
     this.input?.clearGameplayState();
     this.modal.hidden = false;
     requestAnimationFrame(() => this.modal?.setAttribute('data-visible', 'true'));

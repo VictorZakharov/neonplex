@@ -73,6 +73,7 @@ describe('VirtualJoystick', () => {
   let fakeDocument: FakeDocument;
   let element: FakeJoystickElement;
   let directions: Array<Direction | null>;
+  let onViewportInterruption: jest.Mock<void, []>;
   let onUserGesture: jest.Mock<void, []>;
   let joystick: VirtualJoystick;
 
@@ -81,6 +82,7 @@ describe('VirtualJoystick', () => {
     fakeDocument = new FakeDocument();
     element = new FakeJoystickElement();
     directions = [];
+    onViewportInterruption = jest.fn();
     onUserGesture = jest.fn();
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -92,6 +94,7 @@ describe('VirtualJoystick', () => {
     });
     joystick = new VirtualJoystick(element as unknown as HTMLElement, {
       onDirectionChange: (direction) => directions.push(direction),
+      onViewportInterruption,
       onUserGesture,
     });
     joystick.mount();
@@ -152,6 +155,7 @@ describe('VirtualJoystick', () => {
 
       expect(directions).toEqual(['right', null]);
       expect(element.captures.has(8)).toBe(false);
+      expect(onViewportInterruption).toHaveBeenCalledTimes(1);
     },
   );
 

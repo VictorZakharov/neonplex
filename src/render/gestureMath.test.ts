@@ -10,6 +10,7 @@ import {
 describe('gestureMath', () => {
   it('uses a dead zone and keeps the dominant direction stable near a diagonal', () => {
     expect(directionFromDisplacement({ x: 5, y: 4 }, null, 10)).toBeNull();
+    expect(directionFromDisplacement({ x: 10, y: 0 }, null, 10)).toBeNull();
     expect(directionFromDisplacement({ x: 30, y: 8 }, null, 10)).toBe('right');
     expect(directionFromDisplacement({ x: 24, y: 25 }, 'right', 10)).toBe('right');
     expect(directionFromDisplacement({ x: 20, y: 30 }, 'right', 10)).toBe('down');
@@ -25,6 +26,7 @@ describe('gestureMath', () => {
   it('uses a finger-sized minimum hit target around the player', () => {
     const player = { x: 100, y: 100, tileSize: 30 };
     expect(isPlayerHit({ x: 127, y: 100 }, player)).toBe(true);
+    expect(isPlayerHit({ x: 128, y: 100 }, player)).toBe(true);
     expect(isPlayerHit({ x: 129, y: 100 }, player)).toBe(false);
   });
 
