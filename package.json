@@ -21,7 +21,7 @@
     "webpack"
   ],
   "engines": {
-    "node": ">=22.15.0",
+    "node": ">=24.0.0",
     "npm": ">=10.0.0"
   },
   "description": "A neon-industrial, Supaplex-inspired 2D puzzle-action game built with TypeScript and Canvas.",

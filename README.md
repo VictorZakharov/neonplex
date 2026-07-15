@@ -12,7 +12,7 @@ The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. G
 
 ## Run locally
 
-Prerequisites: Node.js 22.15 or newer and npm 10 or newer.
+Prerequisites: Node.js 24 or newer and npm 10 or newer.
 
 ```powershell
 npm ci
