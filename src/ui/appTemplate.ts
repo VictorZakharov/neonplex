@@ -13,8 +13,14 @@ export const appTemplate = (): string => `
         <strong id="hud-level">First Shift</strong>
       </div>
       <div class="topbar__actions">
-        <button id="sound-toggle" class="icon-button sound-button" data-ui="sound" data-muted="false" type="button" aria-label="Mute sound">
-          <i></i><span>SOUND ON</span>
+        <button id="sound-toggle" class="icon-button sound-button" data-ui="sound" data-muted="false" type="button" aria-label="Sound" aria-pressed="true" title="Mute sound">
+          <svg class="sound-button__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path class="sound-button__note-stem" d="M9.5 17.5V6L20 3.5V15" />
+            <ellipse class="sound-button__note-head" cx="6" cy="17.5" rx="3.5" ry="2.5" />
+            <ellipse class="sound-button__note-head" cx="16.5" cy="15" rx="3.5" ry="2.5" />
+            <path class="sound-button__mute-mark" d="M3 3L21 21" />
+          </svg>
+          <span>SOUND ON</span>
         </button>
         <button class="icon-button pause-button" data-input="pause" type="button" aria-label="Pause game"><i></i><i></i></button>
       </div>

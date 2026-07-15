@@ -521,6 +521,7 @@
   .hud-rail--left .extraction-count {
     grid-column: 1;
     grid-row: 1;
+    align-self: center;
     gap: 1px;
     justify-content: center;
     margin: 0;

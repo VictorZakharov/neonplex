@@ -491,7 +491,8 @@ export class App {
     this.audio.setEnabled(enabled);
     if (this.soundButton !== null) {
       this.soundButton.dataset.muted = enabled ? 'false' : 'true';
-      this.soundButton.setAttribute('aria-label', enabled ? 'Mute sound' : 'Enable sound');
+      this.soundButton.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+      this.soundButton.title = enabled ? 'Mute sound' : 'Enable sound';
       this.soundButton.querySelector('span')?.replaceChildren(enabled ? 'SOUND ON' : 'MUTED');
     }
     saveAudioEnabled(enabled);
