@@ -75,7 +75,7 @@ export const appTemplate = (): string => `
         <button data-input="down" type="button" aria-label="Move down">▼</button>
         <button data-input="right" type="button" aria-label="Move right">▶</button>
       </div>
-      <button class="pulse-control" data-input="action" type="button" aria-label="Hold for two seconds to deploy pulse disk beneath carrier"><i></i><span>PULSE</span></button>
+      <button class="pulse-control" data-input="action" type="button" aria-label="Hold for 1.5 seconds to deploy pulse disk beneath carrier"><i></i><span>PULSE</span></button>
     </div>
 
     <footer class="footerbar">

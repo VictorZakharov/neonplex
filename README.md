@@ -27,7 +27,7 @@ Open `http://localhost:8080`.
 | --- | --- | --- |
 | Move | `WASD` or arrow keys | Direction pad |
 | Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction | Hold Pulse + direction |
-| Deploy a collected Pulse Disk beneath the Carrier | Hold `Space` alone for 2 seconds | Hold Pulse for 2 seconds |
+| Deploy a collected Pulse Disk beneath the Carrier | Hold `Space` alone for 1.5 seconds | Hold Pulse for 1.5 seconds |
 | Push a Zonk | Move horizontally into it when the next cell is clear | Direction pad |
 | Pan the map | Drag with either mouse button | Drag the level |
 | Return to camera follow | Move the Carrier | Move the Carrier |
@@ -36,7 +36,7 @@ Open `http://localhost:8080`.
 | Restart a sector | Hold `R` for 2 seconds | Pause menu |
 | Navigate menus | Arrows/WASD, `Tab`, `Home`, `End`, `Enter`, `Space` | Tap controls |
 
-Disk input is deliberately chord-safe. A direction pressed with `Space` performs stationary consumption and resets the deployment timer. Only an uninterrupted two-second hold deploys a Disk on the Carrier's current cell. Restart uses the same hold-to-confirm pattern, with an in-world progress indicator and no duplicate popup underneath it.
+Disk input is deliberately chord-safe. A direction pressed with `Space` performs stationary consumption and resets the deployment timer. Only an uninterrupted 1.5-second hold deploys a Disk on the Carrier's current cell. Restart uses the same hold-to-confirm pattern but keeps its two-second threshold, with an in-world progress indicator and no duplicate popup underneath it.
 
 ## Game rules
 
@@ -104,7 +104,7 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 76 deterministic tests across 12 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 79 deterministic tests across 13 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
 | Script | Purpose |
 | --- | --- |

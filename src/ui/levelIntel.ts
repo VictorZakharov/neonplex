@@ -63,7 +63,7 @@ export const LEVEL_INTEL: readonly LevelIntel[] = [
       {
         icon: 'disk',
         name: 'Pulse Disk',
-        description: 'Move into the yellow disk or use Space plus a direction to collect it. Hold Space alone for two seconds to arm it beneath the Carrier; direction input resets the timer.',
+        description: 'Move into the yellow disk or use Space plus a direction to collect it. Hold Space alone for 1.5 seconds to arm it beneath the Carrier; direction input resets the timer.',
         danger: true,
       },
       {
