@@ -115,14 +115,6 @@ export class Renderer {
     this.camera.cancelInteractions();
   }
 
-  public zoomIn(): void {
-    this.camera.zoomIn();
-  }
-
-  public zoomOut(): void {
-    this.camera.zoomOut();
-  }
-
   public getPlayerScreenAnchor(): PlayerScreenAnchor | null {
     return this.camera.getPlayerScreenAnchor();
   }

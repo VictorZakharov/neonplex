@@ -64,7 +64,6 @@ export class App {
     const canvas = this.requireElement<HTMLCanvasElement>('#game-canvas');
     const minimapCanvas = this.requireElement<HTMLCanvasElement>('#minimap-canvas');
     const minimapZoom = this.requireElement('#minimap-zoom');
-    const touchZoom = this.requireElement('#touch-zoom-label');
     this.modal = this.requireElement('#modal');
     this.modalContent = this.requireElement('#modal-content');
     this.liveRegion = this.requireElement('#live-region');
@@ -96,7 +95,7 @@ export class App {
         void this.audio.activate().catch(() => undefined);
       },
     });
-    this.renderer = new Renderer(canvas, minimapCanvas, [minimapZoom, touchZoom], {
+    this.renderer = new Renderer(canvas, minimapCanvas, minimapZoom, {
       onPlayerDirection: (direction) => {
         this.input?.setVirtualDirection('player-hold', direction);
       },
@@ -483,12 +482,6 @@ export class App {
         break;
       case 'sound':
         this.toggleSound();
-        break;
-      case 'zoom-in':
-        this.renderer?.zoomIn();
-        break;
-      case 'zoom-out':
-        this.renderer?.zoomOut();
         break;
     }
   };

@@ -100,18 +100,6 @@ export class CameraController {
     this.manuallyPanned = false;
   }
 
-  public zoomIn(): void {
-    this.beginZoomGesture();
-    this.setAnimatedZoomAnchor(this.viewportCenter());
-    this.adjustTargetZoom(true);
-  }
-
-  public zoomOut(): void {
-    this.beginZoomGesture();
-    this.setAnimatedZoomAnchor(this.viewportCenter());
-    this.adjustTargetZoom(false);
-  }
-
   public handleViewportResize(viewport: Viewport): void {
     const previousViewport = this.viewport;
     const dimensionsChanged =
@@ -361,15 +349,6 @@ export class CameraController {
     const aligned = target.x === player.x || target.y === player.y;
     const isCurrentCell = target.x === player.x && target.y === player.y;
     if (aligned && !isCurrentCell) this.interactions.onTravelTarget?.(target);
-  }
-
-  private beginZoomGesture(): void {
-    this.interactions.onUserGesture?.();
-    this.interactions.onCancelTravel?.();
-  }
-
-  private viewportCenter(): ScreenPoint {
-    return { x: this.viewport.width / 2, y: this.viewport.height / 2 };
   }
 
   private setAnimatedZoomAnchor(point: ScreenPoint): void {
