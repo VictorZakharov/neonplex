@@ -15,10 +15,11 @@ describe('ActionChordState', () => {
     });
   });
 
-  it('deploys exactly once after an uninterrupted two-second hold', () => {
+  it('deploys exactly once after an uninterrupted 1.5-second hold', () => {
     const chord = new ActionChordState();
     const startedAt = 1_000;
 
+    expect(ACTION_HOLD_DURATION_MS).toBe(1_500);
     expect(chord.pressAction(null, startedAt)).toBe(true);
     expect(chord.getDeploymentHoldProgress(startedAt)).toBe(0);
     expect(
@@ -70,7 +71,9 @@ describe('ActionChordState', () => {
 
     expect(chord.restartDeploymentHold(1_500)).toBe(true);
     expect(chord.getDeploymentHoldProgress(1_500)).toBe(0);
-    expect(chord.getDeploymentHoldProgress(2_500)).toBe(0.5);
+    expect(
+      chord.getDeploymentHoldProgress(1_500 + ACTION_HOLD_DURATION_MS / 2),
+    ).toBe(0.5);
 
     chord.completeDeploymentHold();
     expect(chord.consume(null).action).toBe(true);

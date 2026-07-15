@@ -229,14 +229,14 @@ export class ScreenEffectsRenderer {
   private particleConfig(type: GameEvent['type']): ParticleConfig | null {
     switch (type) {
       case 'dig':
-        return { count: 7, speed: 1.6, lift: 0.2, life: 0.42, size: 0.08, drag: 4, colors: ['#8ca4ac', '#406579', '#54d9e6'] };
+      case 'push':
+        return null;
       case 'collect':
         return { count: 22, speed: 2.4, lift: 0.4, life: 0.72, size: 0.075, drag: 2.5, colors: ['#ffffff', '#67f6ff', '#4a8dff'] };
       case 'disk-pickup':
       case 'disk-deploy':
         return { count: 14, speed: 1.7, lift: 0.2, life: 0.52, size: 0.07, drag: 3, colors: ['#fff7a1', '#ffc94e', '#ff6d5a'] };
       case 'impact':
-      case 'push':
         return { count: 9, speed: 1.2, lift: 0.15, life: 0.38, size: 0.055, drag: 4, colors: ['#e0edf3', '#7f9aa8', '#43e0ff'] };
       case 'explode':
       case 'death':

@@ -1,5 +1,5 @@
 export const RESTART_HOLD_DURATION_MS = 2_000;
-export const ACTION_HOLD_DURATION_MS = 2_000;
+export const ACTION_HOLD_DURATION_MS = 1_500;
 
 export const holdProgress = (
   startedAtMs: number,
