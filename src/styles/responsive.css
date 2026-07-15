@@ -330,8 +330,7 @@
 
   .virtual-joystick[data-active="true"] .virtual-joystick__thumb { filter: brightness(1.22); transition: none; }
 
-  .pulse-control,
-  .touch-zoom-controls button {
+  .pulse-control {
     border: 1px solid rgba(104, 226, 255, 0.38);
     background: rgba(4, 16, 27, 0.9);
     color: rgba(172, 244, 255, 0.85);
@@ -339,8 +338,7 @@
     touch-action: none;
   }
 
-  .pulse-control:active,
-  .touch-zoom-controls button:active { background: rgba(67, 216, 240, 0.26); }
+  .pulse-control:active { background: rgba(67, 216, 240, 0.26); }
 
   .pulse-control {
     position: absolute;
@@ -360,20 +358,6 @@
   .pulse-control i { width: 24px; height: 24px; border: 2px solid #ffd765; border-radius: 50%; box-shadow: 0 0 10px rgba(255, 215, 101, 0.4); }
   .pulse-control span { color: #d9c37f; font-size: 10px; letter-spacing: 0.1em; }
 
-  .touch-zoom-controls {
-    position: absolute;
-    right: auto;
-    bottom: max(36px, calc(env(safe-area-inset-bottom) + 30px));
-    left: calc(50% + 16px);
-    display: grid;
-    grid-template-columns: 44px 36px 44px;
-    align-items: center;
-    transform: translateX(-50%);
-    pointer-events: auto;
-  }
-
-  .touch-zoom-controls button { width: 44px; height: 48px; padding: 0; font-family: var(--display); font-size: 25px; cursor: pointer; }
-  .touch-zoom-controls output { display: grid; height: 34px; border-top: 1px solid rgba(104, 226, 255, 0.2); border-bottom: 1px solid rgba(104, 226, 255, 0.2); background: rgba(2, 11, 20, 0.82); place-items: center; color: #7796a2; font-size: 10px; }
 }
 
 /* Every device that receives the touch layer also receives a dedicated control
@@ -434,10 +418,6 @@
     height: 68px;
   }
 
-  .touch-zoom-controls {
-    left: calc(50% + 14px);
-    grid-template-columns: 44px 28px 44px;
-  }
 }
 
 /* Touch landscapes use a shallow status strip and float controls over the board.
@@ -454,22 +434,26 @@
     padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
   }
 
-  .brand { gap: 8px; }
+  .brand { min-width: 44px; min-height: 44px; justify-content: center; gap: 8px; }
   .brand__mark { width: 30px; height: 30px; }
   .brand strong { font-size: 15px; }
   .brand em,
-  .mission-id,
   .sound-button span { display: none; }
   .sound-button { width: 44px; padding: 0; }
 
   .game-stage {
     --touch-control-dock: 0px;
-    grid-template-columns: clamp(132px, 21vw, 168px) minmax(0, 1fr);
-    grid-template-rows: 44px minmax(0, 1fr);
-    grid-template-areas:
-      "mission telemetry"
-      "play play";
-    gap: 2px;
+    --topbar-left-edge: max(
+      clamp(150px, 24vw, 186px),
+      calc(env(safe-area-inset-left) + 142px)
+    );
+    --topbar-right-edge: calc(env(safe-area-inset-right) + 104px);
+    --mission-top-width: clamp(92px, 13vw, 112px);
+    z-index: 11;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "play";
+    gap: 0;
     padding: 2px;
   }
 
@@ -482,62 +466,77 @@
   .game-stage:has(.modal:not([hidden])) { grid-template-areas: "play"; }
 
   .hud-rail {
+    position: absolute;
+    z-index: 2;
+    top: -44px;
     width: auto;
-    height: 44px;
-    padding: 3px 5px;
+    height: 42px;
+    padding: 2px 4px;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    contain: layout paint;
+    pointer-events: none;
   }
+
+  .hud-rail::before { display: none; }
 
   .hud-rail--left {
-    grid-area: mission;
+    left: var(--topbar-left-edge);
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto 3px auto;
-    gap: 2px 6px;
+    grid-template-rows: minmax(0, 1fr) 2px;
+    gap: 0 2px;
+    width: var(--mission-top-width);
     align-content: center;
     justify-content: stretch;
+    border-right: 1px solid rgba(86, 224, 255, 0.18);
+    border-left: 1px solid rgba(86, 224, 255, 0.18);
   }
 
-  .hud-rail--left .hud-label {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: center;
+  .mission-id,
+  .hud-rail--left .hud-label,
+  .hud-rail--left #hud-objective,
+  .tactical-map > div,
+  .telemetry > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
     overflow: hidden;
-    font-size: 9px;
+    clip: rect(0, 0, 0, 0);
+    clip-path: inset(50%);
     white-space: nowrap;
+    border: 0;
   }
+
+  .mission-id { left: 0; transform: none; }
 
   .hud-rail--left .extraction-count {
-    grid-column: 2;
+    grid-column: 1;
     grid-row: 1;
+    gap: 1px;
+    justify-content: center;
     margin: 0;
   }
 
-  .hud-rail--left .extraction-count strong { font-size: 19px; }
+  .hud-rail--left .extraction-count strong { font-size: 18px; }
   .hud-rail--left .extraction-count span,
-  .hud-rail--left .extraction-count em { font-size: 10px; }
+  .hud-rail--left .extraction-count em { font-size: 9px; }
 
   .hud-rail--left .progress-track {
     grid-column: 1 / -1;
     grid-row: 2;
   }
 
-  .hud-rail--left #hud-objective {
-    grid-column: 1;
-    grid-row: 3;
-    align-self: center;
-    margin: 0;
-    overflow: hidden;
-    font-size: 8px;
-    line-height: 1;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .performance-meter {
     position: static;
     grid-column: 2;
-    grid-row: 3;
+    grid-row: 1;
     align-self: center;
+    grid-template-columns: auto auto;
+    gap: 0 2px;
+    justify-content: center;
     margin: 0;
     padding: 0;
     border: 0;
@@ -545,49 +544,61 @@
     box-shadow: none;
   }
 
-  .performance-meter span { font-size: 8px; }
+  .performance-meter span { font-size: 9px; letter-spacing: 0; }
   .performance-meter strong { font-size: 12px; }
 
+  .hud-rail--left:has(#hud-objective[data-complete="true"]) .performance-meter {
+    display: none;
+  }
+
+  .hud-rail--left #hud-objective[data-complete="true"] {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+    width: 5ch;
+    height: auto;
+    margin: 0;
+    overflow: hidden;
+    clip: auto;
+    clip-path: none;
+    color: var(--success);
+    font-size: 9px;
+    line-height: 1;
+  }
+
   .hud-rail--right {
-    grid-area: telemetry;
+    right: var(--topbar-right-edge);
+    left: calc(var(--topbar-left-edge) + var(--mission-top-width) + 4px);
     display: grid;
-    grid-template-columns: minmax(120px, 1.5fr) repeat(3, minmax(64px, 1fr));
+    grid-template-columns:
+      minmax(62px, 1.4fr)
+      minmax(44px, 0.75fr)
+      minmax(58px, 1fr)
+      minmax(42px, 0.7fr);
     grid-template-rows: minmax(0, 1fr);
     gap: 3px;
+    padding-right: 0;
   }
 
-  .tactical-map {
-    grid-column: auto;
-    min-width: 0;
-    gap: 2px;
-  }
+  .tactical-map { grid-column: auto; min-width: 0; gap: 0; }
 
-  .tactical-map > div {
-    flex-direction: row;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .tactical-map span,
-  .tactical-map em { font-size: 8px; }
-
-  .tactical-map canvas { height: 22px; }
+  .tactical-map canvas { height: 38px; border-color: rgba(86, 226, 255, 0.14); }
 
   .telemetry {
     min-width: 0;
     min-height: 0;
     height: 100%;
     padding: 2px 4px;
+    border: 0;
+    border-left: 1px solid rgba(86, 226, 255, 0.18);
+    background: transparent;
+    box-shadow: none;
+    clip-path: none;
   }
 
-  .telemetry span { font-size: 8px; }
-  .telemetry strong { font-size: 12px; }
-
-  /* The generic compact label supplies DISKS with a pseudo-element. Reassert
-     its hidden source text after the landscape typography rule to avoid a
-     duplicated "PULSE DISKSDISKS" label. */
-  .telemetry.telemetry--disk > span { font-size: 0; }
-  .telemetry.telemetry--disk > span::after { font-size: 8px; }
+  .telemetry strong { font-size: clamp(11px, 1.65vw, 14px); }
+  .telemetry--disk strong i { width: 11px; height: 11px; margin-right: 0; border-width: 1px; }
   .signal { display: none; }
 
   /* The board now occupies the entire play row; controls are transparent
@@ -621,14 +632,6 @@
 
   .pulse-control i { width: 20px; height: 20px; }
 
-  .touch-zoom-controls {
-    bottom: max(12px, calc(env(safe-area-inset-bottom) + 8px));
-    left: 50%;
-    grid-template-columns: 44px 32px 44px;
-  }
-
-  .touch-zoom-controls button { height: 44px; }
-
   .performance-meter > div:not(:first-child) { display: none; }
 
   .briefing {
@@ -655,6 +658,28 @@
   .briefing span { font-size: 9px; }
   .briefing strong { font-size: 16px; }
   .briefing em { font-size: 10px; }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 680px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-width: 680px) {
+  .tactical-map { display: none; }
+
+  .hud-rail--right {
+    grid-template-columns:
+      minmax(40px, 0.8fr)
+      minmax(50px, 1fr)
+      minmax(38px, 0.75fr);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 600px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-width: 600px) {
+  .brand > span:last-child { display: none; }
+
+  .game-stage {
+    --topbar-left-edge: max(52px, calc(env(safe-area-inset-left) + 44px));
+    --mission-top-width: 88px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

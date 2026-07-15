@@ -74,7 +74,7 @@ export const LEVEL_INTEL: readonly LevelIntel[] = [
       {
         icon: 'map',
         name: 'Tactical Optics',
-        description: 'Use the wheel or touch zoom controls to magnify, pinch around a point, and drag the map with a mouse button or one finger. Moving the Carrier smoothly restores camera follow.',
+        description: 'Use the wheel or pinch around a point to magnify, and drag the map with a mouse button or one finger. Moving the Carrier smoothly restores camera follow.',
       },
     ],
   },

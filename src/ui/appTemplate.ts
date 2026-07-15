@@ -35,7 +35,7 @@ export const appTemplate = (): string => `
       </section>
 
       <div class="canvas-shell">
-        <canvas id="game-canvas" role="img" aria-label="Neonplex mining grid. Move with WASD, arrow keys, the touch joystick, or by holding and dragging from the Carrier; release to stop. Tap a clear straight route to travel and pinch or use the zoom controls to change magnification."></canvas>
+        <canvas id="game-canvas" role="img" aria-label="Neonplex mining grid. Move with WASD, arrow keys, the touch joystick, or by holding and dragging from the Carrier; release to stop. Tap a clear straight route to travel, pinch on a touch screen, or use the mouse wheel to zoom."></canvas>
         <div class="frame-corner frame-corner--tl"></div><div class="frame-corner frame-corner--tr"></div>
         <div class="frame-corner frame-corner--bl"></div><div class="frame-corner frame-corner--br"></div>
         <div id="briefing" class="briefing" data-visible="false"></div>
@@ -63,11 +63,6 @@ export const appTemplate = (): string => `
               <i class="virtual-joystick__direction virtual-joystick__direction--left"></i>
               <b class="virtual-joystick__thumb"></b>
             </span>
-          </div>
-          <div class="touch-zoom-controls" aria-label="Map zoom controls">
-            <button data-ui="zoom-out" type="button" aria-label="Zoom out">&minus;</button>
-            <output id="touch-zoom-label" data-zoom-prefix="" aria-label="Current map zoom">100%</output>
-            <button data-ui="zoom-in" type="button" aria-label="Zoom in">+</button>
           </div>
           <button class="pulse-control" data-input="action" type="button" aria-label="Hold for 1.5 seconds to deploy pulse disk beneath carrier"><i></i><span>PULSE</span></button>
         </div>
