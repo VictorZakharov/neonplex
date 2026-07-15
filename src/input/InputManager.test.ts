@@ -1,4 +1,5 @@
-import type { InputFrame } from '../game/types';
+import { PLAYER_STEP_QUEUE_CAPACITY } from '../game/playerStepConfig';
+import type { Direction, InputFrame } from '../game/types';
 import type { ActionChordState } from './ActionChordState';
 import { InputManager } from './InputManager';
 
@@ -90,6 +91,63 @@ describe('InputManager virtual input', () => {
       travelTarget: null,
     });
     expect(manager.consumeFrame()).not.toHaveProperty('travelTarget');
+  });
+
+  it('preserves queued finger-follow steps after the drag ends', () => {
+    const manager = createManager();
+    manager.queueTravelTarget({ x: 6, y: 4 });
+
+    manager.queuePlayerStep('left');
+    manager.queuePlayerStep('up');
+    manager.endPlayerDrag();
+
+    expect(manager.consumeFrame()).toEqual({
+      direction: null,
+      action: false,
+      excavate: null,
+      stepDirection: 'left',
+      travelTarget: null,
+    });
+    expect(manager.consumeFrame()).toEqual({
+      direction: null,
+      action: false,
+      excavate: null,
+      stepDirection: 'up',
+    });
+    expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');
+  });
+
+  it('bounds burst input without replacing or reordering accepted steps', () => {
+    const manager = createManager();
+    const burst = Array.from(
+      { length: PLAYER_STEP_QUEUE_CAPACITY + 3 },
+      (_, index): Direction => (index % 2 === 0 ? 'right' : 'down'),
+    );
+
+    burst.forEach((direction) => manager.queuePlayerStep(direction));
+    manager.endPlayerDrag();
+
+    const emitted = burst
+      .map(() => manager.consumeFrame().stepDirection)
+      .filter((direction) => direction !== undefined);
+    expect(emitted).toEqual(burst.slice(0, PLAYER_STEP_QUEUE_CAPACITY));
+  });
+
+  it('hard-cancels queued finger steps when manual input takes control', () => {
+    const manager = createManager();
+    manager.queuePlayerStep('left');
+    manager.queuePlayerStep('up');
+
+    manager.setVirtualDirection('joystick', 'right');
+    expect(manager.consumeFrame()).toEqual({
+      direction: 'right',
+      action: false,
+      excavate: null,
+      stepDirection: null,
+    });
+
+    manager.setVirtualDirection('joystick', null);
+    expect(manager.consumeFrame()).not.toHaveProperty('stepDirection');
   });
 
   it('replaces queued travel with cancellation when manual input arrives', () => {

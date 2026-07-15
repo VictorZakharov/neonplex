@@ -4,6 +4,7 @@ import { CameraController } from './CameraController';
 import { ExitIndicatorRenderer } from './ExitIndicatorRenderer';
 import { IntelPreviewRenderer } from './IntelPreviewRenderer';
 import { MinimapRenderer } from './MinimapRenderer';
+import { MAIN_CANVAS_CONTEXT_OPTIONS } from './renderConfig';
 import type {
   CameraInteractionCallbacks,
   IntelPreviewKind,
@@ -35,6 +36,7 @@ export class Renderer {
   private height = 1;
   private dpr = 1;
   private time = 0;
+  private resizePending = false;
 
   public constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -42,7 +44,7 @@ export class Renderer {
     zoomLabels: HTMLElement | readonly HTMLElement[],
     interactions: CameraInteractionCallbacks = {},
   ) {
-    const context = canvas.getContext('2d', { alpha: false, desynchronized: true });
+    const context = canvas.getContext('2d', MAIN_CANVAS_CONTEXT_OPTIONS);
     if (context === null) throw new Error('Canvas 2D is unavailable in this browser.');
     this.context = context;
     const synchronizedZoomLabels: readonly HTMLElement[] = Array.isArray(zoomLabels)
@@ -55,7 +57,9 @@ export class Renderer {
       interactions,
     );
     this.minimap = new MinimapRenderer(minimapCanvas);
-    this.resizeObserver = new ResizeObserver(() => this.resize());
+    this.resizeObserver = new ResizeObserver(() => {
+      this.resizePending = true;
+    });
     this.resizeObserver.observe(canvas);
     this.resizeObserver.observe(minimapCanvas);
     this.resize();
@@ -67,6 +71,7 @@ export class Renderer {
     events: readonly GameEvent[],
     renderLeadSeconds = 0,
   ): void {
+    this.flushPendingResize();
     const delta = Math.min(0.05, Math.max(0, deltaSeconds));
     this.time += delta;
     const viewport = this.viewport();
@@ -144,6 +149,12 @@ export class Renderer {
     this.camera.handleViewportResize(viewport);
     this.effects.resize(viewport, dpr);
     this.minimap.resize(dpr);
+  }
+
+  private flushPendingResize(): void {
+    if (!this.resizePending) return;
+    this.resizePending = false;
+    this.resize();
   }
 
   private viewport(): Viewport {

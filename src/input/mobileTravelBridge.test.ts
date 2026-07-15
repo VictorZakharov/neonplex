@@ -1,5 +1,6 @@
 import { GameEngine } from '../game/GameEngine';
 import { Tile, type InputFrame, type LevelDefinition } from '../game/types';
+import { PlayerDragTracker } from '../render/PlayerDragTracker';
 import { InputManager } from './InputManager';
 
 const callbacks = {
@@ -78,27 +79,70 @@ describe('mobile travel input bridge', () => {
     expect(engine.getSnapshot().player).toEqual({ x: 4, y: 1 });
   });
 
-  it('lets a player drag move manually and cancel a queued route', () => {
+  it('lets recent player-drag motion move one cell without running to a wall', () => {
     const { engine, input } = createHarness(['########', '#@    E#', '########']);
     input.queueTravelTarget({ x: 5, y: 1 });
     update(engine, input);
     expect(engine.getSnapshot().player).toEqual({ x: 2, y: 1 });
 
-    input.setVirtualDirection('player-drag', 'left');
+    const drag = new PlayerDragTracker(
+      (direction) => input.queuePlayerStep(direction),
+      () => input.endPlayerDrag(),
+    );
+    drag.begin({ x: 0, y: 0 }, 30);
+    drag.update({ x: -20, y: 0 });
     const dragFrame = input.consumeFrame();
     expect(dragFrame).toEqual({
-      direction: 'left',
+      direction: null,
       action: false,
       excavate: null,
+      stepDirection: 'left',
       travelTarget: null,
     });
     applyFrame(engine, dragFrame);
-    update(engine, input, 5);
-    input.setVirtualDirection('player-drag', null);
+    update(engine, input, 7);
 
     expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
+    drag.end();
+    applyFrame(engine, input.consumeFrame());
     update(engine, input, 24);
     expect(engine.getSnapshot().player).toEqual({ x: 1, y: 1 });
+  });
+
+  it('keeps burst-sampled drag turns ordered through the movement cooldown', () => {
+    const { engine, input } = createHarness([
+      '#######',
+      '#@   E#',
+      '#     #',
+      '#######',
+    ]);
+    const drag = new PlayerDragTracker(
+      (direction) => input.queuePlayerStep(direction),
+      () => input.endPlayerDrag(),
+    );
+    drag.begin({ x: 0, y: 0 }, 30);
+    drag.update({ x: 60, y: 0 });
+    drag.update({ x: 60, y: 30 });
+    drag.update({ x: 30, y: 30 });
+    drag.end();
+
+    const visited: { x: number; y: number }[] = [];
+    let previous = engine.getSnapshot().player;
+    for (let frame = 0; frame < 30; frame += 1) {
+      update(engine, input);
+      const current = engine.getSnapshot().player;
+      if (current.x !== previous.x || current.y !== previous.y) {
+        visited.push({ ...current });
+        previous = current;
+      }
+    }
+
+    expect(visited).toEqual([
+      { x: 2, y: 1 },
+      { x: 3, y: 1 },
+      { x: 3, y: 2 },
+      { x: 2, y: 2 },
+    ]);
   });
 
   it('stops an in-progress route when the input bridge explicitly cancels it', () => {

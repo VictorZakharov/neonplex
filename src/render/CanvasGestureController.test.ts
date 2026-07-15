@@ -72,7 +72,8 @@ describe('CanvasGestureController', () => {
   let applyPinch: jest.Mock<void, [PinchGestureUpdate]>;
   let dispatchTap: jest.Mock<void, [ScreenPoint]>;
   let zoomFromWheel: jest.Mock<void, [boolean, ScreenPoint]>;
-  let onPlayerDirection: jest.Mock<void, [Direction | null]>;
+  let onPlayerStep: jest.Mock<void, [Direction]>;
+  let onPlayerDragEnd: jest.Mock<void, []>;
   let onCancelTravel: jest.Mock<void, []>;
   let onUserGesture: jest.Mock<void, []>;
   let controller: CanvasGestureController;
@@ -86,7 +87,8 @@ describe('CanvasGestureController', () => {
     applyPinch = jest.fn();
     dispatchTap = jest.fn();
     zoomFromWheel = jest.fn();
-    onPlayerDirection = jest.fn();
+    onPlayerStep = jest.fn();
+    onPlayerDragEnd = jest.fn();
     onCancelTravel = jest.fn();
     onUserGesture = jest.fn();
 
@@ -109,7 +111,8 @@ describe('CanvasGestureController', () => {
       zoomFromWheel,
     };
     const interactions: CameraInteractionCallbacks = {
-      onPlayerDirection,
+      onPlayerStep,
+      onPlayerDragEnd,
       onCancelTravel,
       onUserGesture,
     };
@@ -151,31 +154,46 @@ describe('CanvasGestureController', () => {
     expect(dispatchTap).not.toHaveBeenCalled();
   });
 
-  it('turns a touch near the player into held movement and releases it on pointer up', () => {
+  it('steps only while the finger keeps advancing', () => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 3, 127, 100));
     canvas.dispatchEvent(pointerEvent('pointermove', 3, 165, 100));
 
-    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
-      'right',
-    ]);
+    expect(onPlayerStep).toHaveBeenCalledWith('right');
     expect(canvas.captures.has(3)).toBe(true);
 
-    canvas.dispatchEvent(pointerEvent('pointerup', 3, 165, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 3, 165, 100));
+    expect(onPlayerStep).toHaveBeenCalledTimes(1);
 
-    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
-      'right',
-      null,
-    ]);
+    canvas.dispatchEvent(pointerEvent('pointermove', 3, 183, 100));
+    expect(onPlayerStep).toHaveBeenLastCalledWith('right');
+    expect(onPlayerStep).toHaveBeenCalledTimes(2);
+
+    canvas.dispatchEvent(pointerEvent('pointerup', 3, 183, 100));
+
+    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
     expect(canvas.captures.has(3)).toBe(false);
     expect(canvas.dataset.panning).toBe('false');
     expect(dispatchTap).not.toHaveBeenCalled();
+  });
+
+  it('steers from recent finger motion instead of the original touch point', () => {
+    canvas.dispatchEvent(pointerEvent('pointerdown', 31, 100, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 31, 130, 100));
+    canvas.dispatchEvent(pointerEvent('pointermove', 31, 100, 100));
+
+    expect(onPlayerStep.mock.calls.map(([direction]) => direction)).toEqual([
+      'right',
+      'left',
+    ]);
+    expect(onPlayerDragEnd).not.toHaveBeenCalled();
   });
 
   it('falls back to a tap when the player hit area overlaps a nearby cell', () => {
     canvas.dispatchEvent(pointerEvent('pointerdown', 30, 127, 100));
     canvas.dispatchEvent(pointerEvent('pointerup', 30, 127, 100));
 
-    expect(onPlayerDirection).not.toHaveBeenCalled();
+    expect(onPlayerStep).not.toHaveBeenCalled();
+    expect(onPlayerDragEnd).not.toHaveBeenCalled();
     expect(dispatchTap).toHaveBeenCalledWith({ x: 127, y: 100 });
   });
 
@@ -184,10 +202,8 @@ describe('CanvasGestureController', () => {
     canvas.dispatchEvent(pointerEvent('pointermove', 4, 130, 100));
     canvas.dispatchEvent(pointerEvent('pointerdown', 5, 200, 100));
 
-    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
-      'right',
-      null,
-    ]);
+    expect(onPlayerStep).toHaveBeenCalledWith('right');
+    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
 
     canvas.dispatchEvent(pointerEvent('pointermove', 5, 230, 100));
 
@@ -198,7 +214,7 @@ describe('CanvasGestureController', () => {
       previousDistance: 70,
       nextDistance: 100,
     });
-    expect(onPlayerDirection).toHaveBeenCalledTimes(2);
+    expect(onPlayerStep).toHaveBeenCalledTimes(1);
     expect(dispatchTap).not.toHaveBeenCalled();
   });
 
@@ -241,10 +257,8 @@ describe('CanvasGestureController', () => {
       fakeWindow.dispatchEvent(new Event(eventType));
     }
 
-    expect(onPlayerDirection.mock.calls.map(([direction]) => direction)).toEqual([
-      'right',
-      null,
-    ]);
+    expect(onPlayerStep).toHaveBeenCalledWith('right');
+    expect(onPlayerDragEnd).toHaveBeenCalledTimes(1);
     expect(onCancelTravel).toHaveBeenCalledTimes(1);
     expect(canvas.captures.size).toBe(0);
     expect(canvas.dataset.panning).toBe('false');
@@ -266,7 +280,8 @@ describe('CanvasGestureController', () => {
     expect(canvas.captures.has(9)).toBe(false);
     expect(canvas.dataset.panning).toBe('false');
     expect(dispatchTap).not.toHaveBeenCalled();
-    expect(onPlayerDirection).not.toHaveBeenCalled();
+    expect(onPlayerStep).not.toHaveBeenCalled();
+    expect(onPlayerDragEnd).not.toHaveBeenCalled();
   });
 
   it('hands an active mouse pan over to the first touch without shared capture', () => {

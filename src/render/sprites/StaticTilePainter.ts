@@ -1,6 +1,7 @@
 import { Tile } from '../../game/types';
 
 const TAU = Math.PI * 2;
+const CACHE_LOGICAL_SIZE = 96;
 
 /** Paints and caches non-animated cell surfaces. */
 export class StaticTilePainter {
@@ -40,12 +41,11 @@ export class StaticTilePainter {
     y: number,
     size: number,
   ): void {
-    const pixelSize = this.pixelSize(size);
-    const key = `underlay:${pixelSize}`;
+    const key = 'underlay';
     let cached = this.cache.get(key);
     if (cached === undefined) {
-      const created = this.createCache(pixelSize, size, (cacheContext) => {
-        this.drawCellUnderlay(cacheContext, 0, 0, size);
+      const created = this.createCache((cacheContext) => {
+        this.drawCellUnderlay(cacheContext, 0, 0, CACHE_LOGICAL_SIZE);
       });
       if (created === null) return;
       this.cache.set(key, created);
@@ -61,16 +61,15 @@ export class StaticTilePainter {
     y: number,
     size: number,
   ): void {
-    const pixelSize = this.pixelSize(size);
-    const key = `${tile}:${pixelSize}`;
+    const key = String(tile);
     let cached = this.cache.get(key);
     if (cached === undefined) {
-      const created = this.createCache(pixelSize, size, (cacheContext) => {
-        this.drawCellUnderlay(cacheContext, 0, 0, size);
-        if (tile === Tile.Dirt) this.drawDirt(cacheContext, 0, 0, size);
-        else if (tile === Tile.Steel) this.drawSteel(cacheContext, 0, 0, size);
-        else if (tile === Tile.Carbon) this.drawCarbon(cacheContext, 0, 0, size);
-        else this.drawWall(cacheContext, 0, 0, size);
+      const created = this.createCache((cacheContext) => {
+        this.drawCellUnderlay(cacheContext, 0, 0, CACHE_LOGICAL_SIZE);
+        if (tile === Tile.Dirt) this.drawDirt(cacheContext, 0, 0, CACHE_LOGICAL_SIZE);
+        else if (tile === Tile.Steel) this.drawSteel(cacheContext, 0, 0, CACHE_LOGICAL_SIZE);
+        else if (tile === Tile.Carbon) this.drawCarbon(cacheContext, 0, 0, CACHE_LOGICAL_SIZE);
+        else this.drawWall(cacheContext, 0, 0, CACHE_LOGICAL_SIZE);
       });
       if (created === null) return;
       this.cache.set(key, created);
@@ -79,21 +78,16 @@ export class StaticTilePainter {
     context.drawImage(cached, x, y, size, size);
   }
 
-  private pixelSize(size: number): number {
-    return Math.max(8, Math.round((size * this.dpr) / 4) * 4);
-  }
-
   private createCache(
-    pixelSize: number,
-    logicalSize: number,
     paint: (context: CanvasRenderingContext2D) => void,
   ): HTMLCanvasElement | null {
+    const pixelSize = Math.max(8, Math.round(CACHE_LOGICAL_SIZE * this.dpr));
     const canvas = document.createElement('canvas');
     canvas.width = pixelSize;
     canvas.height = pixelSize;
     const context = canvas.getContext('2d');
     if (context === null) return null;
-    const scale = pixelSize / logicalSize;
+    const scale = pixelSize / CACHE_LOGICAL_SIZE;
     context.setTransform(scale, 0, 0, scale, 0, 0);
     paint(context);
     return canvas;
