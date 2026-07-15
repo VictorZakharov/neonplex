@@ -108,7 +108,7 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 182 deterministic tests across 26 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 185 deterministic tests across 26 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
 | Script | Purpose |
 | --- | --- |

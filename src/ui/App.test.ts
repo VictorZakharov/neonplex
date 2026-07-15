@@ -45,3 +45,33 @@ describe('App modal interaction boundary', () => {
     }
   });
 });
+
+describe('App sound toggle', () => {
+  it('keeps the visual, tooltip, and accessible states synchronized', () => {
+    const replaceChildren = jest.fn();
+    const setAttribute = jest.fn();
+    const soundButton = {
+      dataset: { muted: 'false' },
+      querySelector: jest.fn(() => ({ replaceChildren })),
+      setAttribute,
+      title: 'Mute sound',
+    };
+    const app = new App({} as HTMLElement);
+    Reflect.set(app, 'soundButton', soundButton);
+    const toggleSound = Reflect.get(app, 'toggleSound') as () => void;
+
+    toggleSound.call(app);
+
+    expect(soundButton.dataset.muted).toBe('true');
+    expect(setAttribute).toHaveBeenLastCalledWith('aria-pressed', 'false');
+    expect(soundButton.title).toBe('Enable sound');
+    expect(replaceChildren).toHaveBeenLastCalledWith('MUTED');
+
+    toggleSound.call(app);
+
+    expect(soundButton.dataset.muted).toBe('false');
+    expect(setAttribute).toHaveBeenLastCalledWith('aria-pressed', 'true');
+    expect(soundButton.title).toBe('Mute sound');
+    expect(replaceChildren).toHaveBeenLastCalledWith('SOUND ON');
+  });
+});
