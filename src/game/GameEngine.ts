@@ -1,13 +1,7 @@
-import {
-  DIRECTION_VECTOR,
-  Tile,
-  type Direction,
-  type GameEvent,
-  type GamePhase,
-  type GameSnapshot,
-  type InputFrame,
-  type LevelDefinition,
-  type Point,
+import { DIRECTION_VECTOR, Tile } from './types';
+import type {
+  Direction, GameEvent, GamePhase, GameSnapshot,
+  InputFrame, LevelDefinition, Point,
 } from './types';
 import {
   BOMB_FUSE_TICKS,
@@ -27,6 +21,7 @@ import {
 import type { EnemyWorld, ParsedLevel } from './internalTypes';
 import { parseLevel } from './levelParser';
 import { MotionTracker } from './MotionTracker';
+import { PlayerStepController } from './PlayerStepController';
 import { EnemySystem } from './systems/EnemySystem';
 import { initializeTiles, isRoundedSupport } from './tileRules';
 import { TravelController } from './TravelController';
@@ -46,6 +41,7 @@ export class GameEngine {
   private elapsedSeconds = 0;
   private tick = 0;
   private movementCooldown = 0;
+  private readonly playerStep = new PlayerStepController();
   private readonly motion = new MotionTracker();
   private gravityAccumulator = 0;
   private enemyAccumulator = 0;
@@ -83,6 +79,7 @@ export class GameEngine {
   public pause(): void {
     if (this.phase === 'playing') {
       this.phase = 'paused';
+      this.playerStep.clear();
       this.travel.clear();
     }
   }
@@ -99,6 +96,7 @@ export class GameEngine {
     this.elapsedSeconds = 0;
     this.tick = 0;
     this.movementCooldown = 0;
+    this.playerStep.clear();
     this.motion.reset();
     this.gravityAccumulator = 0;
     this.enemyAccumulator = 0;
@@ -127,15 +125,18 @@ export class GameEngine {
     this.gravityAccumulator += deltaSeconds;
     this.enemyAccumulator += deltaSeconds;
 
+    if (this.playerStep.accept(input.stepDirection)) this.travel.clear();
+
     const travelDirection = this.travel.directionFor(input);
 
     if (input.excavate !== null) {
       this.tryRemoteConsume(input.excavate);
     } else {
       if (input.action) this.deployDisk();
-      const direction = input.direction ?? travelDirection;
+      const direction = this.playerStep.directionFor(input.direction, travelDirection);
       if (direction !== null && this.movementCooldown <= 0) {
         this.tryMove(direction);
+        this.playerStep.complete(input.direction);
         this.travel.completeStep();
         this.movementCooldown = MOVE_INTERVAL;
       }

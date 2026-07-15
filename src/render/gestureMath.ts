@@ -10,6 +10,7 @@ import type {
 } from './renderTypes';
 
 const EPSILON = 0.001;
+const PINCH_SCALE_LOG_THRESHOLD = 0.008;
 
 export const distanceBetween = (first: ScreenPoint, second: ScreenPoint): number =>
   Math.hypot(second.x - first.x, second.y - first.y);
@@ -55,6 +56,19 @@ export const isPlayerHit = (
   if (player === null) return false;
   const radius = Math.max(28, player.tileSize * 0.6);
   return Math.hypot(point.x - player.x, point.y - player.y) <= radius;
+};
+
+/** Ignores sub-percent pinch sensor noise while allowing deliberate motion to accumulate. */
+export const stabilizedPinchDistance = (
+  baselineDistance: number,
+  candidateDistance: number,
+  logThreshold = PINCH_SCALE_LOG_THRESHOLD,
+): number => {
+  const baseline = Math.max(EPSILON, baselineDistance);
+  const candidate = Math.max(EPSILON, candidateDistance);
+  return Math.abs(Math.log(candidate / baseline)) >= Math.max(0, logThreshold)
+    ? candidate
+    : baseline;
 };
 
 export const gridPointAtScreen = (

@@ -3,6 +3,7 @@ import {
   gridPointAtScreen,
   isPlayerHit,
   preserveViewportWorldCenter,
+  stabilizedPinchDistance,
   transformCameraForPinch,
 } from './gestureMath';
 
@@ -72,6 +73,28 @@ describe('gestureMath', () => {
     expect(result.zoom).toBe(1.72);
     expect(result.left).toBeLessThanOrEqual(20);
     expect(result.top).toBeLessThanOrEqual(20);
+  });
+
+  it('rejects pinch sensor jitter without losing cumulative deliberate motion', () => {
+    const baseline = 200;
+    expect(stabilizedPinchDistance(baseline, 199.5)).toBe(baseline);
+    expect(stabilizedPinchDistance(baseline, 200.1)).toBe(baseline);
+    expect(stabilizedPinchDistance(baseline, 198.3)).toBe(198.3);
+  });
+
+  it('keeps max zoom stable through noisy pinch samples and exits on intent', () => {
+    let baseline = 200;
+    let zoom = 1.72;
+    for (const distance of [199.5, 200.1, 199.6, 200]) {
+      const stableDistance = stabilizedPinchDistance(baseline, distance);
+      zoom = Math.min(1.72, zoom * (stableDistance / baseline));
+      baseline = stableDistance;
+    }
+    expect(zoom).toBe(1.72);
+
+    const deliberateDistance = stabilizedPinchDistance(baseline, 198.3);
+    zoom = Math.min(1.72, zoom * (deliberateDistance / baseline));
+    expect(zoom).toBeLessThan(1.72);
   });
 
   it('preserves a manually panned world center when orientation changes tile size', () => {

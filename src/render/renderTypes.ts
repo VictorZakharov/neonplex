@@ -47,7 +47,8 @@ export interface ScreenPoint {
 }
 
 export interface CameraInteractionCallbacks {
-  readonly onPlayerDirection?: (direction: Direction | null) => void;
+  readonly onPlayerStep?: (direction: Direction) => void;
+  readonly onPlayerDragEnd?: () => void;
   readonly onTravelTarget?: (target: Point) => void;
   readonly onCancelTravel?: () => void;
   readonly onUserGesture?: () => void;

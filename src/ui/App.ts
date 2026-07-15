@@ -97,8 +97,8 @@ export class App {
       },
     });
     this.renderer = new Renderer(canvas, minimapCanvas, [minimapZoom, touchZoom], {
-      onPlayerDirection: (direction) =>
-        this.input?.setVirtualDirection('canvas-player-drag', direction),
+      onPlayerStep: (direction) => this.input?.queuePlayerStep(direction),
+      onPlayerDragEnd: () => this.input?.endPlayerDrag(),
       onTravelTarget: (target) => this.input?.queueTravelTarget(target),
       onCancelTravel: () => this.input?.cancelTravel(),
       onUserGesture: () => {

@@ -46,8 +46,8 @@
   .sector-card__meta { grid-column: 3; grid-row: 1 / 3; flex-direction: column; align-self: center; text-align: right; }
 }
 
-/* Compact geometry is independent from input modality: resizing and rotation never
-   remove mission-critical telemetry from the screen. */
+/* Compact portrait geometry reserves a real HUD dock above the board. Keeping the
+   rails in normal grid flow prevents HUD clicks from reaching hidden canvas cells. */
 @media (max-width: 760px), (max-height: 610px) {
   .app-shell {
     grid-template-rows: max(54px, calc(46px + env(safe-area-inset-top))) minmax(0, 1fr);
@@ -71,27 +71,51 @@
   .sound-button { width: 44px; padding: 0; }
   .icon-button { min-width: 44px; height: 44px; }
 
-  .game-stage { display: block; padding: 4px; }
-  .canvas-shell { width: 100%; height: 100%; }
+  .game-stage {
+    display: grid;
+    grid-template-columns: clamp(112px, 29vw, 150px) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "mission telemetry"
+      "play play";
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .canvas-shell {
+    grid-area: play;
+    width: auto;
+    height: auto;
+  }
+
+  .game-stage:has(.modal:not([hidden])) {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "play";
+  }
+
+  .game-stage:has(.modal:not([hidden])) .hud-rail { display: none; }
+
   .footerbar { display: none; }
 
   .hud-rail {
-    position: absolute;
-    z-index: 7;
+    position: relative;
+    z-index: 1;
+    inset: auto;
+    min-width: 0;
+    width: auto;
     height: auto;
     border: 1px solid rgba(86, 224, 255, 0.22);
     background: rgba(2, 8, 16, 0.84);
-    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.36);
+    box-shadow: none;
     pointer-events: none;
   }
 
   .hud-rail::before { opacity: 0.68; }
 
   .hud-rail--left {
-    top: 12px;
-    left: max(12px, env(safe-area-inset-left));
+    grid-area: mission;
     display: flex;
-    width: clamp(104px, 28vw, 132px);
     padding: 9px;
     justify-content: flex-start;
   }
@@ -116,12 +140,10 @@
   .performance-meter b { font-size: 10px; }
 
   .hud-rail--right {
-    top: 12px;
-    right: max(12px, env(safe-area-inset-right));
+    grid-area: telemetry;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 5px;
-    width: clamp(146px, 43vw, 220px);
     padding: 8px;
   }
 
@@ -165,6 +187,46 @@
   .intel-panel__footer { flex-direction: column; align-items: stretch; }
   .intel-panel__footer > span { justify-content: center; text-align: center; }
   .intel-panel__footer .primary-button { width: 100%; }
+}
+
+/* Short landscape viewports use slim side rails so scarce vertical space remains
+   available to the board without allowing either rail to overlap it. */
+@media (min-width: 761px) and (max-height: 610px),
+  (orientation: landscape) and (max-height: 520px) {
+  .game-stage {
+    grid-template-columns:
+      clamp(104px, 16vw, 120px)
+      minmax(0, 1fr)
+      clamp(120px, 19vw, 150px);
+    grid-template-rows: minmax(0, 1fr);
+    grid-template-areas: "mission play telemetry";
+    gap: 0;
+  }
+
+  .hud-rail {
+    height: 100%;
+    padding: 8px;
+  }
+
+  .hud-rail--left { justify-content: center; }
+
+  .hud-rail--right {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  .performance-meter {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    left: 7px;
+    order: initial;
+    margin-top: 0;
+  }
+
+  .tactical-map canvas { height: 44px; }
+  .telemetry { min-height: 42px; }
 }
 
 /* Coarse primary pointers and tablet-sized hybrid devices receive the touch
@@ -298,24 +360,80 @@
 
   .touch-zoom-controls {
     position: absolute;
-    right: max(14px, env(safe-area-inset-right));
-    bottom: calc(max(14px, env(safe-area-inset-bottom)) + clamp(88px, 17vmin, 102px));
+    right: auto;
+    bottom: max(36px, calc(env(safe-area-inset-bottom) + 30px));
+    left: calc(50% + 16px);
     display: grid;
-    grid-template-columns: 48px 44px 48px;
+    grid-template-columns: 44px 36px 44px;
     align-items: center;
+    transform: translateX(-50%);
     pointer-events: auto;
   }
 
-  .touch-zoom-controls button { width: 48px; height: 48px; padding: 0; font-family: var(--display); font-size: 25px; cursor: pointer; }
+  .touch-zoom-controls button { width: 44px; height: 48px; padding: 0; font-family: var(--display); font-size: 25px; cursor: pointer; }
   .touch-zoom-controls output { display: grid; height: 34px; border-top: 1px solid rgba(104, 226, 255, 0.2); border-bottom: 1px solid rgba(104, 226, 255, 0.2); background: rgba(2, 11, 20, 0.82); place-items: center; color: #7796a2; font-size: 10px; }
 }
 
+/* Every device that receives the touch layer also receives a dedicated control
+   dock. This includes hybrid tablets while they are being operated by touch. */
+@media (hover: none) and (pointer: coarse),
+  (any-pointer: coarse) and (max-width: 1400px) {
+  .game-stage {
+    --touch-control-dock: calc(clamp(116px, 18dvh, 148px) + env(safe-area-inset-bottom));
+  }
+
+  #game-canvas { height: calc(100% - var(--touch-control-dock)); }
+
+  .mobile-controls {
+    inset: auto 0 0;
+    height: var(--touch-control-dock);
+    border-top: 1px solid rgba(86, 224, 255, 0.2);
+    background: linear-gradient(180deg, rgba(2, 8, 16, 0.42), rgba(2, 8, 16, 0.94));
+  }
+
+  .frame-corner--bl,
+  .frame-corner--br { bottom: calc(var(--touch-control-dock) + 8px); }
+
+  #app[data-input-mode="mouse"] #game-canvas { height: 100%; }
+
+  #app[data-input-mode="mouse"] .frame-corner--bl,
+  #app[data-input-mode="mouse"] .frame-corner--br { bottom: 8px; }
+
+  .performance-meter > div:not(:first-child) { display: none; }
+  .performance-meter { margin-top: 5px; padding: 3px 5px; }
+  .tactical-map canvas { height: clamp(40px, 7dvh, 56px); }
+  .telemetry { min-height: 40px; padding: 4px; }
+  .telemetry--disk > span { font-size: 0; }
+  .telemetry--disk > span::after { content: "DISKS"; font-size: 10px; }
+}
+
+@media (hover: none) and (pointer: coarse) and (max-width: 370px) {
+  .virtual-joystick {
+    left: max(8px, env(safe-area-inset-left));
+    width: 96px;
+    height: 96px;
+  }
+
+  .pulse-control {
+    right: max(8px, env(safe-area-inset-right));
+    width: 68px;
+    height: 68px;
+  }
+
+  .touch-zoom-controls {
+    left: calc(50% + 14px);
+    grid-template-columns: 44px 28px 44px;
+  }
+}
+
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-height: 520px), (any-pointer: coarse) and (max-width: 1400px) and (orientation: landscape) and (max-height: 520px) {
-  .virtual-joystick { width: clamp(104px, 30vh, 132px); height: clamp(104px, 30vh, 132px); }
+  .virtual-joystick {
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: 100px;
+    height: 100px;
+  }
   .pulse-control { width: 76px; height: 76px; }
-  .touch-zoom-controls { bottom: calc(max(12px, env(safe-area-inset-bottom)) + 86px); }
-  .hud-rail--left,
-  .hud-rail--right { top: 8px; }
+  .touch-zoom-controls { bottom: max(24px, calc(env(safe-area-inset-bottom) + 18px)); }
   .performance-meter > div:not(:first-child) { display: none; }
   .tactical-map canvas { height: 44px; }
 }

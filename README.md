@@ -25,7 +25,7 @@ Open `http://localhost:8080`.
 
 | Action | Keyboard and mouse | Touch |
 | --- | --- | --- |
-| Move | `WASD` or arrow keys | Drag the virtual joystick, or touch and drag outward from the Carrier |
+| Move | `WASD` or arrow keys | Drag the virtual joystick, or drag the Carrier along the desired path for precise steps |
 | Travel along a clear straight corridor | - | Tap a reachable cell in the Carrier's row or column |
 | Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction | Hold Pulse + joystick direction |
 | Deploy a collected Pulse Disk beneath the Carrier | Hold `Space` alone for 1.5 seconds | Hold Pulse for 1.5 seconds |
@@ -68,8 +68,8 @@ All three layouts are distinct and selectable from the campaign menu. Local best
 - Carrier moves, Zonk pushes, rolls, falls, Infotron falls, Sentinel translation, and Sentinel rotation animate continuously between cells.
 - Traversal excavation is linear; stationary consumption uses a vortex-like effect matched to the consumed tile.
 - Camera follow, focal-point-preserving wheel zoom, and manual map pan transition smoothly without lateral jumps.
-- Phones and tablets have a continuous analog-style movement joystick, direct Carrier drag steering, clear-corridor tap travel, midpoint-preserving pinch zoom, large zoom controls, safe-area spacing, and live portrait/landscape reflow.
-- Wide layouts keep the tactical minimap in a dedicated right rail; phone layouts condense mission telemetry into readable corner panels.
+- Phones and tablets have a continuous analog-style movement joystick, step-accurate Carrier drag steering, clear-corridor tap travel, stabilized midpoint-preserving pinch zoom, large zoom controls, safe-area spacing, and live portrait/landscape reflow.
+- Wide layouts keep the tactical minimap in a dedicated right rail; narrow portrait layouts reserve a compact top HUD dock, and short landscape layouts use slim side rails without covering the board.
 - The responsive textured shell keeps compact extraction status, runtime, score, Disk inventory, minimap, and readable learning and pause screens visible after rotation.
 - Optional, subdued performance telemetry reports FPS, 1% low, frame interval, and render/draw time. It can be shown or hidden persistently from the pause menu.
 - Audio is event-only and has a persistent mute control. There is no music loop or idle hum.
@@ -107,7 +107,7 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 157 deterministic tests across 21 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 173 deterministic tests across 25 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
 | Script | Purpose |
 | --- | --- |

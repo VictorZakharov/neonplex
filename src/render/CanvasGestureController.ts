@@ -1,10 +1,10 @@
-import type { Direction } from '../game/types';
 import {
-  directionFromDisplacement,
   distanceBetween,
   isPlayerHit,
   midpointBetween,
+  stabilizedPinchDistance,
 } from './gestureMath';
+import { PlayerDragTracker } from './PlayerDragTracker';
 import type {
   CameraInteractionCallbacks,
   CanvasGestureHost,
@@ -13,12 +13,12 @@ import type {
 } from './renderTypes';
 
 const TOUCH_PAN_THRESHOLD = 10;
-const PLAYER_DRAG_DEAD_ZONE = 14;
 
 /** Arbitrates mouse pan, touch pan, player drag, tap and pinch gestures. */
 export class CanvasGestureController {
   private readonly abortController = new AbortController();
   private readonly touchPoints = new Map<number, ScreenPoint>();
+  private readonly playerDrag: PlayerDragTracker;
   private canvasLeft = 0;
   private canvasTop = 0;
   private canvasScaleX = 1;
@@ -29,17 +29,19 @@ export class CanvasGestureController {
   private touchMode: TouchGestureMode = 'idle';
   private primaryTouchId: number | null = null;
   private touchStart: ScreenPoint = { x: 0, y: 0 };
-  private playerDragDirection: Direction | null = null;
-  private playerDragEngaged = false;
   private pinchPointerIds: readonly [number, number] | null = null;
   private pinchCentroid: ScreenPoint = { x: 0, y: 0 };
-  private pinchDistance = 1;
+  private pinchScaleDistance = 1;
 
   public constructor(
     private readonly canvas: HTMLCanvasElement,
     private readonly host: CanvasGestureHost,
     private readonly interactions: CameraInteractionCallbacks,
   ) {
+    this.playerDrag = new PlayerDragTracker(
+      (direction) => this.interactions.onPlayerStep?.(direction),
+      () => this.interactions.onPlayerDragEnd?.(),
+    );
     canvas.addEventListener('wheel', this.onWheel, {
       passive: false,
       signal: this.abortController.signal,
@@ -167,10 +169,13 @@ export class CanvasGestureController {
   private beginFirstTouch(event: PointerEvent, point: ScreenPoint): void {
     this.primaryTouchId = event.pointerId;
     this.touchStart = point;
-    this.playerDragEngaged = false;
-    this.touchMode = isPlayerHit(point, this.host.getPlayerScreenAnchor())
+    const player = this.host.getPlayerScreenAnchor();
+    this.touchMode = isPlayerHit(point, player)
       ? 'player'
       : 'tap';
+    if (this.touchMode === 'player' && player !== null) {
+      this.playerDrag.begin(point, player.tileSize);
+    }
     this.updatePanningState();
   }
 
@@ -179,12 +184,12 @@ export class CanvasGestureController {
     const first = entries[0];
     const second = entries[1];
     if (first === undefined || second === undefined) return;
-    this.setPlayerDragDirection(null);
+    this.playerDrag.end();
     this.primaryTouchId = null;
     this.touchMode = 'pinch';
     this.pinchPointerIds = [first[0], second[0]];
     this.pinchCentroid = midpointBetween(first[1], second[1]);
-    this.pinchDistance = Math.max(0.001, distanceBetween(first[1], second[1]));
+    this.pinchScaleDistance = Math.max(0.001, distanceBetween(first[1], second[1]));
     this.updatePanningState();
   }
 
@@ -195,14 +200,18 @@ export class CanvasGestureController {
     if (first === undefined || second === undefined) return;
     const centroid = midpointBetween(first, second);
     const distance = Math.max(0.001, distanceBetween(first, second));
+    const stabilizedDistance = stabilizedPinchDistance(
+      this.pinchScaleDistance,
+      distance,
+    );
     this.host.applyPinch({
       previousCentroid: this.pinchCentroid,
       nextCentroid: centroid,
-      previousDistance: this.pinchDistance,
-      nextDistance: distance,
+      previousDistance: this.pinchScaleDistance,
+      nextDistance: stabilizedDistance,
     });
     this.pinchCentroid = centroid;
-    this.pinchDistance = distance;
+    this.pinchScaleDistance = stabilizedDistance;
   }
 
   private updateSingleTouch(event: PointerEvent, point: ScreenPoint): void {
@@ -212,13 +221,7 @@ export class CanvasGestureController {
       y: point.y - this.touchStart.y,
     };
     if (this.touchMode === 'player') {
-      const direction = directionFromDisplacement(
-        displacement,
-        this.playerDragDirection,
-        PLAYER_DRAG_DEAD_ZONE,
-      );
-      if (direction !== null) this.playerDragEngaged = true;
-      this.setPlayerDragDirection(direction);
+      this.playerDrag.update(point);
       return;
     }
 
@@ -231,12 +234,6 @@ export class CanvasGestureController {
       this.updatePanningState();
     }
     if (this.touchMode === 'pan') this.host.panBy(displacement);
-  }
-
-  private setPlayerDragDirection(direction: Direction | null): void {
-    if (direction === this.playerDragDirection) return;
-    this.playerDragDirection = direction;
-    this.interactions.onPlayerDirection?.(direction);
   }
 
   private rebaseRemainingTouchAsPan(): void {
@@ -254,9 +251,8 @@ export class CanvasGestureController {
   }
 
   private finishTouchGesture(): void {
-    this.setPlayerDragDirection(null);
+    this.playerDrag.end();
     this.primaryTouchId = null;
-    this.playerDragEngaged = false;
     this.pinchPointerIds = null;
     this.touchMode = 'idle';
     this.invalidateCanvasGeometry();
@@ -337,13 +333,10 @@ export class CanvasGestureController {
     if (
       this.touchMode === 'player' &&
       event.pointerId === this.primaryTouchId &&
-      !this.playerDragEngaged &&
+      !this.playerDrag.isEngaged &&
       distanceBetween(this.touchStart, finalPoint) < TOUCH_PAN_THRESHOLD
     ) {
       this.host.dispatchTap(finalPoint);
-    }
-    if (this.touchMode === 'player' && event.pointerId === this.primaryTouchId) {
-      this.setPlayerDragDirection(null);
     }
     this.touchPoints.delete(event.pointerId);
     this.releasePointer(event.pointerId);

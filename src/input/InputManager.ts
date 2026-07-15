@@ -1,3 +1,4 @@
+import { PLAYER_STEP_QUEUE_CAPACITY } from '../game/playerStepConfig';
 import type { Direction, InputFrame, Point } from '../game/types';
 import { ActionChordState } from './ActionChordState';
 import type { InputCallbacks } from './inputTypes';
@@ -34,6 +35,10 @@ export class InputManager {
   private readonly actionSources = new Set<string>();
   private readonly actionChord = new ActionChordState();
   private virtualJoystick: VirtualJoystick | null = null;
+  private readonly pendingPlayerSteps: Direction[] = [];
+  private playerStepCancellationPending = false;
+  private playerStepSessionHasSteps = false;
+  private playerStepActive = false;
   private pendingTravelTarget: Point | null | undefined;
   private travelActive = false;
   private restartStartedAt: number | null = null;
@@ -77,9 +82,14 @@ export class InputManager {
 
   public consumeFrame(): InputFrame {
     const frame = this.actionChord.consume(this.currentDirection());
+    const stepDirection = this.nextPlayerStepEdge();
     const travelTarget = this.pendingTravelTarget;
     this.pendingTravelTarget = undefined;
-    return travelTarget === undefined ? frame : { ...frame, travelTarget };
+    return {
+      ...frame,
+      ...(stepDirection === undefined ? {} : { stepDirection }),
+      ...(travelTarget === undefined ? {} : { travelTarget }),
+    };
   }
 
   public setVirtualDirection(source: string, direction: Direction | null): void {
@@ -91,7 +101,13 @@ export class InputManager {
   }
 
   public queueTravelTarget(target: Point): void {
-    if (this.actionSources.size > 0 || this.currentDirection() !== null) return;
+    if (
+      this.actionSources.size > 0 ||
+      this.currentDirection() !== null ||
+      this.playerStepActive
+    ) {
+      return;
+    }
     this.pendingTravelTarget = { x: target.x, y: target.y };
     this.travelActive = true;
   }
@@ -100,6 +116,21 @@ export class InputManager {
     if (!this.travelActive && this.pendingTravelTarget === undefined) return;
     this.pendingTravelTarget = null;
     this.travelActive = false;
+  }
+
+  public queuePlayerStep(direction: Direction): void {
+    if (this.actionSources.size > 0 || this.currentDirection() !== null) return;
+    this.cancelTravel();
+    this.playerStepActive = true;
+    this.playerStepSessionHasSteps = true;
+    // Preserve the earliest accepted path when input temporarily outruns rendering.
+    if (this.pendingPlayerSteps.length >= PLAYER_STEP_QUEUE_CAPACITY) return;
+    this.pendingPlayerSteps.push(direction);
+  }
+
+  /** Ends the gesture without discarding discrete steps already accepted from it. */
+  public endPlayerDrag(): void {
+    this.playerStepActive = false;
   }
 
   public getRestartHoldProgress(currentTimeMs: number): number | null {
@@ -118,6 +149,7 @@ export class InputManager {
     this.actionSources.clear();
     this.actionChord.clear();
     this.virtualJoystick?.reset();
+    this.discardPlayerSteps();
     this.cancelTravel();
   }
 
@@ -271,6 +303,7 @@ export class InputManager {
     const previousDirection = this.heldDirectionSources.get(source);
     if (previousDirection === direction) return;
     if (this.actionChord.pressDirection(direction)) this.cancelActionTimer();
+    this.discardPlayerSteps();
     this.cancelTravel();
     this.heldDirectionSources.set(source, direction);
     const previousIndex = this.directionSourceOrder.indexOf(source);
@@ -293,6 +326,7 @@ export class InputManager {
   private pressActionSource(source: string): void {
     if (this.actionSources.has(source)) return;
     this.cancelTravel();
+    this.discardPlayerSteps();
     this.actionSources.add(source);
     if (this.actionSources.size === 1) this.beginActionHold();
   }
@@ -303,5 +337,21 @@ export class InputManager {
     if (progress !== null && progress >= 1) this.actionChord.completeDeploymentHold();
     this.cancelActionTimer();
     this.actionChord.releaseAction();
+  }
+
+  private nextPlayerStepEdge(): Direction | null | undefined {
+    if (this.playerStepCancellationPending) {
+      this.playerStepCancellationPending = false;
+      return null;
+    }
+    return this.pendingPlayerSteps.shift();
+  }
+
+  private discardPlayerSteps(): void {
+    this.playerStepActive = false;
+    this.pendingPlayerSteps.length = 0;
+    if (!this.playerStepSessionHasSteps) return;
+    this.playerStepSessionHasSteps = false;
+    this.playerStepCancellationPending = true;
   }
 }
