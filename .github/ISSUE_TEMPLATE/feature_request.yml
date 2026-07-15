@@ -1,0 +1,60 @@
+name: Feature request
+description: Propose a focused improvement to Neonplex.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and pull requests for this idea.
+          required: true
+        - label: This request is about one focused problem or capability.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What player or contributor need would this address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Explain the desired behavior, not only its visual treatment.
+    validations:
+      required: true
+
+  - type: textarea
+    id: gameplay
+    attributes:
+      label: Gameplay and interaction details
+      description: Include controls, level behavior, edge cases, or failure states where relevant.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: textarea
+    id: quality
+    attributes:
+      label: Accessibility and performance considerations
+      description: Note keyboard access, reduced motion, readability, high-refresh rendering, or large-level impact.
+
+  - type: textarea
+    id: assets
+    attributes:
+      label: Asset requirements
+      description: Identify any new art or audio. Contributions must be original or appropriately licensed.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context or mockups
+      description: Drag relevant images or recordings here.
