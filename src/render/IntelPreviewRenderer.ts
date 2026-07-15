@@ -41,6 +41,8 @@ export class IntelPreviewRenderer {
     }
     if (kind === 'player') {
       this.tiles.drawCarrier(context, logicalSize / 2, logicalSize / 2, size, 'right');
+    } else if (kind === 'touch') {
+      this.drawTouchControl(context, inset, inset, size);
     } else if (kind === 'map') {
       this.drawMap(context, inset, inset, size);
     } else if (kind === 'cascade') {
@@ -48,6 +50,39 @@ export class IntelPreviewRenderer {
     } else {
       this.drawChain(context, inset, inset, size);
     }
+  }
+
+  private drawTouchControl(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: number,
+  ): void {
+    const centerX = x + size * 0.43;
+    const centerY = y + size * 0.57;
+    context.save();
+    context.strokeStyle = 'rgba(104, 226, 255, 0.62)';
+    context.fillStyle = 'rgba(5, 23, 35, 0.9)';
+    context.shadowColor = '#56e6ff';
+    context.shadowBlur = size * 0.1;
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.arc(centerX, centerY, size * 0.31, 0, TAU);
+    context.fill();
+    context.stroke();
+    context.fillStyle = '#287d91';
+    context.beginPath();
+    context.arc(centerX + size * 0.08, centerY - size * 0.08, size * 0.14, 0, TAU);
+    context.fill();
+    context.strokeStyle = '#b7f8ff';
+    context.stroke();
+    context.shadowBlur = 0;
+    context.fillStyle = '#ffcf63';
+    context.beginPath();
+    context.arc(x + size * 0.82, y + size * 0.2, size * 0.055, 0, TAU);
+    context.arc(x + size * 0.68, y + size * 0.32, size * 0.04, 0, TAU);
+    context.fill();
+    context.restore();
   }
 
   private drawMap(

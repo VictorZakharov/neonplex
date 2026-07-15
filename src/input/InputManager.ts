@@ -1,4 +1,4 @@
-import type { Direction, InputFrame } from '../game/types';
+import type { Direction, InputFrame, Point } from '../game/types';
 import { ActionChordState } from './ActionChordState';
 import type { InputCallbacks } from './inputTypes';
 import {
@@ -6,6 +6,7 @@ import {
   RESTART_HOLD_DURATION_MS,
   restartHoldProgress,
 } from './restartHoldMath';
+import { VirtualJoystick } from './VirtualJoystick';
 
 type Command = Direction | 'action' | 'pause' | 'restart';
 
@@ -32,6 +33,9 @@ export class InputManager {
   private readonly directionSourceOrder: string[] = [];
   private readonly actionSources = new Set<string>();
   private readonly actionChord = new ActionChordState();
+  private virtualJoystick: VirtualJoystick | null = null;
+  private pendingTravelTarget: Point | null | undefined;
+  private travelActive = false;
   private restartStartedAt: number | null = null;
   private restartCompleted = false;
   private restartTimer = 0;
@@ -47,15 +51,55 @@ export class InputManager {
     window.addEventListener('keydown', this.onKeyDown, options);
     window.addEventListener('keyup', this.onKeyUp, options);
     window.addEventListener('blur', this.clear, options);
+    window.addEventListener('resize', this.clear, options);
+    window.addEventListener('orientationchange', this.clear, options);
     document.addEventListener('visibilitychange', this.onVisibilityChange, options);
+    this.root.addEventListener('pointerdown', this.onPointerModality, {
+      ...options,
+      capture: true,
+    });
     this.root.addEventListener('pointerdown', this.onPointerDown, options);
     this.root.addEventListener('pointerup', this.onPointerUp, options);
     this.root.addEventListener('pointercancel', this.onPointerUp, options);
     this.root.addEventListener('contextmenu', this.preventContextMenu, options);
+
+    const joystickElement = this.root.querySelector<HTMLElement>('[data-joystick]');
+    if (joystickElement !== null) {
+      this.virtualJoystick = new VirtualJoystick(joystickElement, {
+        onDirectionChange: (direction) => {
+          this.setVirtualDirection('joystick', direction);
+        },
+        onUserGesture: this.callbacks.onUserGesture,
+      });
+      this.virtualJoystick.mount();
+    }
   }
 
   public consumeFrame(): InputFrame {
-    return this.actionChord.consume(this.currentDirection());
+    const frame = this.actionChord.consume(this.currentDirection());
+    const travelTarget = this.pendingTravelTarget;
+    this.pendingTravelTarget = undefined;
+    return travelTarget === undefined ? frame : { ...frame, travelTarget };
+  }
+
+  public setVirtualDirection(source: string, direction: Direction | null): void {
+    if (direction === null) {
+      this.releaseDirectionSource(source);
+      return;
+    }
+    this.pressDirectionSource(source, direction);
+  }
+
+  public queueTravelTarget(target: Point): void {
+    if (this.actionSources.size > 0 || this.currentDirection() !== null) return;
+    this.pendingTravelTarget = { x: target.x, y: target.y };
+    this.travelActive = true;
+  }
+
+  public cancelTravel(): void {
+    if (!this.travelActive && this.pendingTravelTarget === undefined) return;
+    this.pendingTravelTarget = null;
+    this.travelActive = false;
   }
 
   public getRestartHoldProgress(currentTimeMs: number): number | null {
@@ -73,9 +117,13 @@ export class InputManager {
     this.directionSourceOrder.length = 0;
     this.actionSources.clear();
     this.actionChord.clear();
+    this.virtualJoystick?.reset();
+    this.cancelTravel();
   }
 
   public dispose(): void {
+    this.virtualJoystick?.dispose();
+    this.virtualJoystick = null;
     this.abortController.abort();
     this.clear();
   }
@@ -134,6 +182,10 @@ export class InputManager {
     } else {
       this.pressDirectionSource(`pointer:${event.pointerId}`, command);
     }
+  };
+
+  private readonly onPointerModality = (event: PointerEvent): void => {
+    this.root.dataset.inputMode = event.pointerType === 'mouse' ? 'mouse' : 'touch';
   };
 
   private readonly onPointerUp = (event: PointerEvent): void => {
@@ -216,9 +268,13 @@ export class InputManager {
   }
 
   private pressDirectionSource(source: string, direction: Direction): void {
-    if (this.heldDirectionSources.has(source)) return;
+    const previousDirection = this.heldDirectionSources.get(source);
+    if (previousDirection === direction) return;
     if (this.actionChord.pressDirection(direction)) this.cancelActionTimer();
+    this.cancelTravel();
     this.heldDirectionSources.set(source, direction);
+    const previousIndex = this.directionSourceOrder.indexOf(source);
+    if (previousIndex >= 0) this.directionSourceOrder.splice(previousIndex, 1);
     this.directionSourceOrder.push(source);
   }
 
@@ -236,6 +292,7 @@ export class InputManager {
 
   private pressActionSource(source: string): void {
     if (this.actionSources.has(source)) return;
+    this.cancelTravel();
     this.actionSources.add(source);
     if (this.actionSources.size === 1) this.beginActionHold();
   }

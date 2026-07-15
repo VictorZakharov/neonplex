@@ -1,21 +1,44 @@
 import type { GameSnapshot } from '../game/types';
 import { exponentialApproach, interpolatedProgress } from './animationMath';
 import { clampCameraAxis, preserveZoomAnchorAxis } from './cameraMath';
+import { CanvasGestureController } from './CanvasGestureController';
+import {
+  gridPointAtScreen,
+  preserveViewportWorldCenter,
+  transformCameraForPinch,
+} from './gestureMath';
 import type {
   BoardLayout,
   CameraFocus,
+  CameraInteractionCallbacks,
+  PinchGestureUpdate,
   PlayerScreenAnchor,
+  ScreenPoint,
   Viewport,
 } from './renderTypes';
 
-const lerp = (from: number, to: number, amount: number): number => from + (to - from) * amount;
+const MINIMUM_ZOOM = 0.68;
+const MAXIMUM_ZOOM = 1.72;
+const ZOOM_STEP = 1.11;
 
-/** Owns camera follow, optical zoom and direct pointer panning. */
+const lerp = (from: number, to: number, amount: number): number =>
+  from + (to - from) * amount;
+
+const zoomLabelPrefix = (label: HTMLElement): string => {
+  const configuredPrefix = label.dataset.zoomPrefix;
+  if (configuredPrefix !== undefined) {
+    return configuredPrefix.length > 0 ? `${configuredPrefix} ` : '';
+  }
+  return label.textContent?.includes('OPTICS') === true ? 'OPTICS ' : '';
+};
+
+/** Owns camera follow and delegates pointer arbitration to the gesture controller. */
 export class CameraController {
-  private readonly abortController = new AbortController();
+  private readonly gestures: CanvasGestureController;
+  private readonly zoomLabelPrefixes = new Map<HTMLElement, string>();
   private zoom = 1;
   private targetZoom = 1;
-  private lastZoomPercent = 100;
+  private lastZoomPercent = -1;
   private cameraLeft = 0;
   private cameraTop = 0;
   private cameraReady = false;
@@ -23,58 +46,95 @@ export class CameraController {
   private lastFocusX = 0;
   private lastFocusY = 0;
   private lastSnapshot: GameSnapshot | null = null;
+  private lastLayout: BoardLayout | null = null;
   private playerScreenAnchor: PlayerScreenAnchor | null = null;
   private viewport: Viewport = { width: 1, height: 1 };
-  private panPointerId: number | null = null;
-  private panStartClientX = 0;
-  private panStartClientY = 0;
   private panStartCameraLeft = 0;
   private panStartCameraTop = 0;
-  private panTravel = 0;
+  private zoomAnchorGridX: number | null = null;
+  private zoomAnchorGridY: number | null = null;
   private manuallyPanned = false;
 
   public constructor(
-    private readonly canvas: HTMLCanvasElement,
-    private readonly zoomLabel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    private readonly zoomLabels: readonly HTMLElement[],
     private readonly reducedMotion: MediaQueryList,
+    private readonly interactions: CameraInteractionCallbacks,
   ) {
-    canvas.addEventListener('wheel', this.onWheel, {
-      passive: false,
-      signal: this.abortController.signal,
-    });
-    canvas.addEventListener('pointerdown', this.onPanPointerDown, {
-      signal: this.abortController.signal,
-    });
-    canvas.addEventListener('pointermove', this.onPanPointerMove, {
-      signal: this.abortController.signal,
-    });
-    for (const eventName of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) {
-      canvas.addEventListener(eventName, this.onPanPointerEnd, {
-        signal: this.abortController.signal,
-      });
+    for (const label of zoomLabels) {
+      this.zoomLabelPrefixes.set(label, zoomLabelPrefix(label));
     }
-    canvas.addEventListener('contextmenu', this.preventCanvasContextMenu, {
-      signal: this.abortController.signal,
-    });
+    this.gestures = new CanvasGestureController(
+      canvas,
+      {
+        getViewport: () => this.viewport,
+        getPlayerScreenAnchor: () => this.getPlayerScreenAnchor(),
+        beginPan: () => this.beginPan(),
+        panBy: (displacement) => this.panBy(displacement),
+        applyPinch: (update) => this.applyPinch(update),
+        dispatchTap: (point) => this.dispatchTravelTarget(point),
+        zoomFromWheel: (zoomIn, focalPoint) => {
+          this.setAnimatedZoomAnchor(focalPoint);
+          this.adjustTargetZoom(zoomIn);
+        },
+      },
+      interactions,
+    );
   }
 
   public dispose(): void {
-    this.abortController.abort();
+    this.gestures.dispose();
   }
 
   public reset(): void {
-    if (
-      this.panPointerId !== null &&
-      this.canvas.hasPointerCapture(this.panPointerId)
-    ) {
-      this.canvas.releasePointerCapture(this.panPointerId);
-    }
+    this.gestures.cancel(true);
     this.cameraReady = false;
     this.lastSnapshot = null;
+    this.lastLayout = null;
     this.playerScreenAnchor = null;
+    this.clearAnimatedZoomAnchor();
     this.manuallyPanned = false;
-    this.panPointerId = null;
-    this.canvas.dataset.panning = 'false';
+  }
+
+  public zoomIn(): void {
+    this.beginZoomGesture();
+    this.setAnimatedZoomAnchor(this.viewportCenter());
+    this.adjustTargetZoom(true);
+  }
+
+  public zoomOut(): void {
+    this.beginZoomGesture();
+    this.setAnimatedZoomAnchor(this.viewportCenter());
+    this.adjustTargetZoom(false);
+  }
+
+  public handleViewportResize(viewport: Viewport): void {
+    if (viewport.width === this.viewport.width && viewport.height === this.viewport.height) {
+      return;
+    }
+    this.gestures.cancel(true);
+    this.settleAnimatedZoom();
+    const snapshot = this.lastSnapshot;
+    if (snapshot !== null && this.cameraReady) {
+      if (this.manuallyPanned) {
+        const camera = preserveViewportWorldCenter({
+          cameraLeft: this.cameraLeft,
+          cameraTop: this.cameraTop,
+          previousViewport: this.viewport,
+          nextViewport: viewport,
+          previousTileSize: this.lastBaseTile * this.zoom,
+          nextTileSize: this.baseTileForViewport(viewport) * this.zoom,
+          boardWidth: snapshot.width,
+          boardHeight: snapshot.height,
+          padding: this.outerPaddingFor(viewport),
+        });
+        this.cameraLeft = camera.left;
+        this.cameraTop = camera.top;
+      } else {
+        this.cameraReady = false;
+      }
+    }
+    this.viewport = viewport;
   }
 
   public updateZoom(deltaSeconds: number, viewport: Viewport): void {
@@ -94,7 +154,7 @@ export class CameraController {
       const padding = this.outerPadding();
       this.cameraLeft = preserveZoomAnchorAxis({
         cameraOffset: this.cameraLeft,
-        focusGridCoordinate: this.lastFocusX,
+        focusGridCoordinate: this.zoomAnchorGridX ?? this.lastFocusX,
         previousTileSize: previousTile,
         nextTileSize: nextTile,
         boardCells: snapshot.width,
@@ -103,7 +163,7 @@ export class CameraController {
       });
       this.cameraTop = preserveZoomAnchorAxis({
         cameraOffset: this.cameraTop,
-        focusGridCoordinate: this.lastFocusY,
+        focusGridCoordinate: this.zoomAnchorGridY ?? this.lastFocusY,
         previousTileSize: previousTile,
         nextTileSize: nextTile,
         boardCells: snapshot.height,
@@ -111,12 +171,8 @@ export class CameraController {
         padding,
       });
     }
-
-    const zoomPercent = Math.round(this.zoom * 100);
-    if (zoomPercent !== this.lastZoomPercent) {
-      this.lastZoomPercent = zoomPercent;
-      this.zoomLabel.textContent = `OPTICS ${zoomPercent}%`;
-    }
+    this.updateZoomLabel();
+    if (this.zoom === this.targetZoom) this.clearAnimatedZoomAnchor();
   }
 
   public layoutFor(
@@ -127,10 +183,7 @@ export class CameraController {
   ): BoardLayout {
     this.viewport = viewport;
     const padding = this.outerPadding();
-    const baseTile = Math.max(
-      26,
-      Math.min(54, Math.min(viewport.width / 15, viewport.height / 10.5)),
-    );
+    const baseTile = this.baseTileForViewport(viewport);
     const tile = baseTile * this.zoom;
     const width = tile * snapshot.width;
     const height = tile * snapshot.height;
@@ -145,7 +198,10 @@ export class CameraController {
       this.lastSnapshot !== null &&
       (this.lastSnapshot.player.x !== snapshot.player.x ||
         this.lastSnapshot.player.y !== snapshot.player.y);
-    if (playerMoved) this.manuallyPanned = false;
+    if (playerMoved) {
+      this.manuallyPanned = false;
+      this.clearAnimatedZoomAnchor();
+    }
 
     const targetLeft = clampCameraAxis(
       viewport.width / 2 - focusX * tile,
@@ -180,7 +236,15 @@ export class CameraController {
       y: this.cameraTop + focusY * tile,
       tileSize: tile,
     };
-    return { tile, width, height, left: this.cameraLeft, top: this.cameraTop };
+    const layout = {
+      tile,
+      width,
+      height,
+      left: this.cameraLeft,
+      top: this.cameraTop,
+    };
+    this.lastLayout = layout;
+    return layout;
   }
 
   public getPlayerScreenAnchor(): PlayerScreenAnchor | null {
@@ -192,7 +256,31 @@ export class CameraController {
   }
 
   private outerPadding(): number {
-    return Math.max(14, Math.min(this.viewport.width, this.viewport.height) * 0.035);
+    return this.outerPaddingFor(this.viewport);
+  }
+
+  private baseTileForViewport(viewport: Viewport): number {
+    return Math.max(
+      26,
+      Math.min(54, Math.min(viewport.width / 15, viewport.height / 10.5)),
+    );
+  }
+
+  private outerPaddingFor(viewport: Viewport): number {
+    return Math.max(14, Math.min(viewport.width, viewport.height) * 0.035);
+  }
+
+  private clampZoom(zoom: number): number {
+    return Math.max(MINIMUM_ZOOM, Math.min(MAXIMUM_ZOOM, zoom));
+  }
+
+  private updateZoomLabel(): void {
+    const zoomPercent = Math.round(this.zoom * 100);
+    if (zoomPercent === this.lastZoomPercent) return;
+    this.lastZoomPercent = zoomPercent;
+    for (const label of this.zoomLabels) {
+      label.textContent = `${this.zoomLabelPrefixes.get(label) ?? ''}${zoomPercent}%`;
+    }
   }
 
   private clampPannedCamera(): void {
@@ -214,52 +302,85 @@ export class CameraController {
     );
   }
 
-  private readonly onPanPointerDown = (event: PointerEvent): void => {
-    const supportsButton =
-      event.pointerType !== 'mouse' || event.button === 0 || event.button === 2;
-    if (!supportsButton || this.panPointerId !== null) return;
-    event.preventDefault();
-    this.panPointerId = event.pointerId;
-    this.panStartClientX = event.clientX;
-    this.panStartClientY = event.clientY;
+  private beginPan(): void {
+    this.settleAnimatedZoom();
     this.panStartCameraLeft = this.cameraLeft;
     this.panStartCameraTop = this.cameraTop;
-    this.panTravel = 0;
-    this.canvas.dataset.panning = 'true';
-    this.canvas.setPointerCapture(event.pointerId);
-  };
+  }
 
-  private readonly onPanPointerMove = (event: PointerEvent): void => {
-    if (event.pointerId !== this.panPointerId) return;
-    event.preventDefault();
-    this.panTravel = Math.hypot(
-      event.clientX - this.panStartClientX,
-      event.clientY - this.panStartClientY,
-    );
-    if (this.panTravel < 2) return;
+  private panBy(displacement: ScreenPoint): void {
     this.manuallyPanned = true;
-    this.cameraLeft = this.panStartCameraLeft + event.clientX - this.panStartClientX;
-    this.cameraTop = this.panStartCameraTop + event.clientY - this.panStartClientY;
+    this.cameraLeft = this.panStartCameraLeft + displacement.x;
+    this.cameraTop = this.panStartCameraTop + displacement.y;
     this.clampPannedCamera();
-  };
+  }
 
-  private readonly onPanPointerEnd = (event: PointerEvent): void => {
-    if (event.pointerId !== this.panPointerId) return;
-    this.panPointerId = null;
-    this.canvas.dataset.panning = 'false';
-    if (this.canvas.hasPointerCapture(event.pointerId)) {
-      this.canvas.releasePointerCapture(event.pointerId);
-    }
-  };
+  private applyPinch(update: PinchGestureUpdate): void {
+    const snapshot = this.lastSnapshot;
+    if (snapshot === null || !this.cameraReady) return;
+    const camera = transformCameraForPinch({
+      cameraLeft: this.cameraLeft,
+      cameraTop: this.cameraTop,
+      previousCentroid: update.previousCentroid,
+      nextCentroid: update.nextCentroid,
+      previousDistance: update.previousDistance,
+      nextDistance: update.nextDistance,
+      baseTileSize: this.lastBaseTile,
+      zoom: this.zoom,
+      minimumZoom: MINIMUM_ZOOM,
+      maximumZoom: MAXIMUM_ZOOM,
+      boardWidth: snapshot.width,
+      boardHeight: snapshot.height,
+      viewport: this.viewport,
+      padding: this.outerPadding(),
+    });
+    this.manuallyPanned = true;
+    this.clearAnimatedZoomAnchor();
+    this.cameraLeft = camera.left;
+    this.cameraTop = camera.top;
+    this.zoom = camera.zoom;
+    this.targetZoom = camera.zoom;
+    this.updateZoomLabel();
+  }
 
-  private readonly preventCanvasContextMenu = (event: MouseEvent): void => {
-    event.preventDefault();
-  };
+  private dispatchTravelTarget(point: ScreenPoint): void {
+    const target = gridPointAtScreen(point, this.lastLayout);
+    const player = this.lastSnapshot?.player;
+    if (target === null || player === undefined) return;
+    const aligned = target.x === player.x || target.y === player.y;
+    const isCurrentCell = target.x === player.x && target.y === player.y;
+    if (aligned && !isCurrentCell) this.interactions.onTravelTarget?.(target);
+  }
 
-  private readonly onWheel = (event: WheelEvent): void => {
-    event.preventDefault();
-    if (event.deltaY === 0) return;
-    const factor = event.deltaY < 0 ? 1.11 : 1 / 1.11;
-    this.targetZoom = Math.max(0.68, Math.min(1.72, this.targetZoom * factor));
-  };
+  private beginZoomGesture(): void {
+    this.interactions.onUserGesture?.();
+    this.interactions.onCancelTravel?.();
+  }
+
+  private viewportCenter(): ScreenPoint {
+    return { x: this.viewport.width / 2, y: this.viewport.height / 2 };
+  }
+
+  private setAnimatedZoomAnchor(point: ScreenPoint): void {
+    if (!this.cameraReady) return;
+    const tile = this.lastBaseTile * this.zoom;
+    this.zoomAnchorGridX = (point.x - this.cameraLeft) / tile;
+    this.zoomAnchorGridY = (point.y - this.cameraTop) / tile;
+    this.manuallyPanned = true;
+  }
+
+  private clearAnimatedZoomAnchor(): void {
+    this.zoomAnchorGridX = null;
+    this.zoomAnchorGridY = null;
+  }
+
+  private settleAnimatedZoom(): void {
+    this.targetZoom = this.zoom;
+    this.clearAnimatedZoomAnchor();
+  }
+
+  private adjustTargetZoom(zoomIn: boolean): void {
+    const factor = zoomIn ? ZOOM_STEP : 1 / ZOOM_STEP;
+    this.targetZoom = this.clampZoom(this.targetZoom * factor);
+  }
 }

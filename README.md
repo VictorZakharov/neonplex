@@ -6,7 +6,7 @@
 
 Neonplex is an original, Supaplex-inspired 2D puzzle-action game with a neon-industrial identity, large scrolling sectors, deterministic grid simulation, and high-refresh presentation. Mine the circuit, collect every Infotron, control gravity, outmaneuver live wall-following Sentinels, and reach the extraction gate.
 
-The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. Gameplay art is procedural, the HUD uses an original generated surface texture, and sound is synthesized at runtime. It does not download fonts, music, sprites, or other runtime assets.
+The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. Gameplay art is procedural, the HUD uses an original generated surface texture stored as an optimized JPEG, and sound is synthesized at runtime. It does not download fonts, music, sprites, or other runtime assets.
 
 **[Play the latest release](https://victorzakharov.github.io/neonplex/)**
 
@@ -25,13 +25,14 @@ Open `http://localhost:8080`.
 
 | Action | Keyboard and mouse | Touch |
 | --- | --- | --- |
-| Move | `WASD` or arrow keys | Direction pad |
-| Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction | Hold Pulse + direction |
+| Move | `WASD` or arrow keys | Drag the virtual joystick, or touch and drag outward from the Carrier |
+| Travel along a clear straight corridor | - | Tap a reachable cell in the Carrier's row or column |
+| Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction | Hold Pulse + joystick direction |
 | Deploy a collected Pulse Disk beneath the Carrier | Hold `Space` alone for 1.5 seconds | Hold Pulse for 1.5 seconds |
-| Push a Zonk | Move horizontally into it when the next cell is clear | Direction pad |
-| Pan the map | Drag with either mouse button | Drag the level |
+| Push a Zonk | Move horizontally into it when the next cell is clear | Virtual joystick |
+| Pan the map | Drag with either mouse button | Drag anywhere on the level away from the Carrier |
 | Return to camera follow | Move the Carrier | Move the Carrier |
-| Zoom from 68% to 172% | Mouse wheel | - |
+| Zoom from 68% to 172% | Mouse wheel | Pinch around a point or use the `−` / `+` controls |
 | Pause or resume | `Esc` or `P` | Pause button |
 | Restart a sector | Hold `R` for 2 seconds | Pause menu |
 | Navigate menus | Arrows/WASD, `Tab`, `Home`, `End`, `Enter`, `Space` | Tap controls |
@@ -67,8 +68,9 @@ All three layouts are distinct and selectable from the campaign menu. Local best
 - Carrier moves, Zonk pushes, rolls, falls, Infotron falls, Sentinel translation, and Sentinel rotation animate continuously between cells.
 - Traversal excavation is linear; stationary consumption uses a vortex-like effect matched to the consumed tile.
 - Camera follow, focal-point-preserving wheel zoom, and manual map pan transition smoothly without lateral jumps.
-- A dedicated right rail contains the tactical minimap, leaving the board unobstructed.
-- The responsive textured shell includes extraction status, runtime, score, Disk inventory, connection state, and readable learning and pause screens.
+- Phones and tablets have a continuous analog-style movement joystick, direct Carrier drag steering, clear-corridor tap travel, midpoint-preserving pinch zoom, large zoom controls, safe-area spacing, and live portrait/landscape reflow.
+- Wide layouts keep the tactical minimap in a dedicated right rail; phone layouts condense mission telemetry into readable corner panels.
+- The responsive textured shell keeps compact extraction status, runtime, score, Disk inventory, minimap, and readable learning and pause screens visible after rotation.
 - Optional, subdued performance telemetry reports FPS, 1% low, frame interval, and render/draw time. It can be shown or hidden persistently from the pause menu.
 - Audio is event-only and has a persistent mute control. There is no music loop or idle hum.
 - Keyboard-first menus, touch controls, visible focus states, semantic controls, live announcements, and reduced-motion support are included.
@@ -86,6 +88,7 @@ Large-map performance work includes:
 - a device-pixel-ratio cap of 2;
 - a desynchronized Canvas 2D context where supported;
 - explicit teardown for the application, renderer, input listeners, observers, camera handlers, and audio.
+- gesture arbitration that gives two-finger pinch priority, separates taps from pans, and cancels held input safely on orientation, visibility, and pointer-capture changes.
 
 The renderer is split into focused camera, board, sprite, minimap, exit-indicator, preview, and effects modules. Input chords, motion tracking, gravity, explosions, and enemy navigation live in isolated systems. ESLint enforces a 500-line effective ceiling for implementation files, and interfaces are kept in dedicated `types.ts` or `*Types.ts` contract modules.
 
@@ -104,7 +107,7 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 79 deterministic tests across 13 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 157 deterministic tests across 21 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
 | Script | Purpose |
 | --- | --- |

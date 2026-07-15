@@ -28,6 +28,8 @@ import type { EnemyWorld, ParsedLevel } from './internalTypes';
 import { parseLevel } from './levelParser';
 import { MotionTracker } from './MotionTracker';
 import { EnemySystem } from './systems/EnemySystem';
+import { initializeTiles, isRoundedSupport } from './tileRules';
+import { TravelController } from './TravelController';
 
 const isSamePoint = (a: Point, b: Point): boolean => a.x === b.x && a.y === b.y;
 
@@ -53,16 +55,21 @@ export class GameEngine {
   private readonly enemyWorld: EnemyWorld;
   private bombFuses = new Map<number, number>();
   private explosionTimers = new Map<number, number>();
+  private readonly travel: TravelController;
 
   public constructor(
     private readonly definition: LevelDefinition,
     private readonly levelIndex: number,
   ) {
     this.initial = parseLevel(definition);
-    this.tiles = this.initial.tiles.slice();
-    this.openZeroObjectiveExit();
+    this.tiles = initializeTiles(this.initial.tiles, this.initial.required);
     this.player = { ...this.initial.spawn };
     this.previousPlayer = { ...this.initial.spawn };
+    this.travel = new TravelController({
+      playerPosition: () => this.player,
+      tileAt: (x, y) => this.tileAt(x, y),
+      isInside: (x, y) => this.isInside(x, y),
+    });
     this.enemySystem = new EnemySystem(this.initial.enemies);
     this.enemyWorld = this.createEnemyWorld();
   }
@@ -76,12 +83,12 @@ export class GameEngine {
   public pause(): void {
     if (this.phase === 'playing') {
       this.phase = 'paused';
+      this.travel.clear();
     }
   }
 
   public reset(): void {
-    this.tiles = this.initial.tiles.slice();
-    this.openZeroObjectiveExit();
+    this.tiles = initializeTiles(this.initial.tiles, this.initial.required);
     this.player = { ...this.initial.spawn };
     this.previousPlayer = { ...this.initial.spawn };
     this.facing = 'right';
@@ -100,6 +107,7 @@ export class GameEngine {
     this.enemySystem.reset(this.initial.enemies);
     this.bombFuses.clear();
     this.explosionTimers.clear();
+    this.travel.clear();
   }
 
   public update(deltaSeconds: number, input: InputFrame): void {
@@ -119,12 +127,16 @@ export class GameEngine {
     this.gravityAccumulator += deltaSeconds;
     this.enemyAccumulator += deltaSeconds;
 
+    const travelDirection = this.travel.directionFor(input);
+
     if (input.excavate !== null) {
       this.tryRemoteConsume(input.excavate);
     } else {
       if (input.action) this.deployDisk();
-      if (input.direction !== null && this.movementCooldown <= 0) {
-        this.tryMove(input.direction);
+      const direction = input.direction ?? travelDirection;
+      if (direction !== null && this.movementCooldown <= 0) {
+        this.tryMove(direction);
+        this.travel.completeStep();
         this.movementCooldown = MOVE_INTERVAL;
       }
     }
@@ -228,6 +240,7 @@ export class GameEngine {
     } else if (targetTile === Tile.ExitOpen) {
       this.movePlayer(target);
       this.phase = 'won';
+      this.travel.clear();
       const timeBonus = Math.max(0, this.definition.parSeconds - Math.floor(this.elapsedSeconds)) * 25;
       this.score += 2000 + timeBonus;
       this.emit('win', target, 1.4);
@@ -359,7 +372,7 @@ export class GameEngine {
         if (this.falling.has(sourceIndex)) {
           this.emit('impact', { x, y }, 0.45);
         }
-        if (this.isRounded(belowTile)) {
+        if (isRoundedSupport(belowTile)) {
           const directions = [-1, 1] as const;
           for (const offset of directions) {
             const side = { x: x + offset, y };
@@ -469,18 +482,12 @@ export class GameEngine {
     }
   }
 
-  private openZeroObjectiveExit(): void {
-    if (this.initial.required !== 0) return;
-    for (let index = 0; index < this.tiles.length; index += 1) {
-      if (this.tiles[index] === Tile.ExitClosed) this.tiles[index] = Tile.ExitOpen;
-    }
-  }
-
   private killPlayer(position: Point, explosionAlreadyActive = false): void {
     if (this.phase !== 'playing') {
       return;
     }
     this.phase = 'lost';
+    this.travel.clear();
     this.motion.clearCellConsumptions();
     this.emit('death', position, 1.3);
     if (!explosionAlreadyActive) this.explode(position);
@@ -504,10 +511,6 @@ export class GameEngine {
 
   private pointFromIndex(index: number): Point {
     return { x: index % this.initial.width, y: Math.floor(index / this.initial.width) };
-  }
-
-  private isRounded(tile: Tile): boolean {
-    return tile === Tile.Zonk || tile === Tile.Infotron || tile === Tile.Wall;
   }
 
   private createEnemyWorld(): EnemyWorld {
