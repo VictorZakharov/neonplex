@@ -69,6 +69,9 @@
   .mission-id { display: none; }
   .sound-button span { display: none; }
   .sound-button { width: 44px; padding: 0; }
+
+  .topbar button:focus-visible,
+  .topbar a:focus-visible { outline-offset: -3px; }
   .icon-button { min-width: 44px; height: 44px; }
 
   .game-stage {
@@ -660,8 +663,8 @@
   .briefing em { font-size: 10px; }
 }
 
-@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 680px),
-  (any-pointer: coarse) and (orientation: landscape) and (max-width: 680px) {
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 700px),
+  (any-pointer: coarse) and (orientation: landscape) and (max-width: 700px) {
   .tactical-map { display: none; }
 
   .hud-rail--right {
