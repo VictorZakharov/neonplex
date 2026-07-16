@@ -1,8 +1,17 @@
 import { FullscreenController } from './FullscreenController';
 
-const createWindow = (coarsePointer: boolean, maxTouchPoints = 0): Window =>
+const createWindow = (
+  coarsePointer: boolean,
+  maxTouchPoints = 0,
+  appDisplay: 'browser' | 'fullscreen' | 'standalone' = 'browser',
+): Window =>
   ({
-    matchMedia: jest.fn(() => ({ matches: coarsePointer })),
+    matchMedia: jest.fn((query: string) => ({
+      matches:
+        query === '(any-pointer: coarse)'
+          ? coarsePointer
+          : query === `(display-mode: ${appDisplay})`,
+    })),
     navigator: { maxTouchPoints },
   }) as unknown as Window;
 
@@ -19,9 +28,7 @@ const createDocument = (
 
 describe('FullscreenController', () => {
   it('requests hidden-navigation fullscreen on coarse-pointer devices', async () => {
-    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
-      Promise.resolve(),
-    );
+    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() => Promise.resolve());
     const controller = new FullscreenController(
       createDocument(requestFullscreen),
       createWindow(true),
@@ -32,9 +39,7 @@ describe('FullscreenController', () => {
   });
 
   it('also requests fullscreen for touch devices without a coarse-pointer match', async () => {
-    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
-      Promise.resolve(),
-    );
+    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() => Promise.resolve());
     const controller = new FullscreenController(
       createDocument(requestFullscreen),
       createWindow(false, 5),
@@ -45,9 +50,7 @@ describe('FullscreenController', () => {
   });
 
   it('does not force desktop pointer devices into fullscreen', async () => {
-    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
-      Promise.resolve(),
-    );
+    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() => Promise.resolve());
     const controller = new FullscreenController(
       createDocument(requestFullscreen),
       createWindow(false),
@@ -58,9 +61,7 @@ describe('FullscreenController', () => {
   });
 
   it('does not force fullscreen for mouse input on touch-capable hardware', async () => {
-    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
-      Promise.resolve(),
-    );
+    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() => Promise.resolve());
     const controller = new FullscreenController(
       createDocument(requestFullscreen),
       createWindow(true, 5),
@@ -70,10 +71,24 @@ describe('FullscreenController', () => {
     expect(requestFullscreen).not.toHaveBeenCalled();
   });
 
+  it.each(['standalone', 'fullscreen'] as const)(
+    'does not request redundant fullscreen from a %s app window',
+    async (displayMode) => {
+      const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
+        Promise.resolve(),
+      );
+      const controller = new FullscreenController(
+        createDocument(requestFullscreen),
+        createWindow(true, 5, displayMode),
+      );
+
+      await expect(controller.requestForGameplay(true)).resolves.toBe(false);
+      expect(requestFullscreen).not.toHaveBeenCalled();
+    },
+  );
+
   it('does not repeat the request while fullscreen is already active', async () => {
-    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
-      Promise.resolve(),
-    );
+    const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() => Promise.resolve());
     const controller = new FullscreenController(
       createDocument(requestFullscreen, {} as Element),
       createWindow(true),
@@ -84,9 +99,7 @@ describe('FullscreenController', () => {
   });
 
   it('fails safely when fullscreen is disabled, unsupported, or rejected', async () => {
-    const disabledRequest = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
-      Promise.resolve(),
-    );
+    const disabledRequest = jest.fn<Promise<void>, [FullscreenOptions?]>(() => Promise.resolve());
     const disabledController = new FullscreenController(
       createDocument(disabledRequest, null, false),
       createWindow(true),
@@ -94,10 +107,7 @@ describe('FullscreenController', () => {
     await expect(disabledController.requestForGameplay(true)).resolves.toBe(false);
     expect(disabledRequest).not.toHaveBeenCalled();
 
-    const unsupportedController = new FullscreenController(
-      createDocument(),
-      createWindow(true),
-    );
+    const unsupportedController = new FullscreenController(createDocument(), createWindow(true));
     await expect(unsupportedController.requestForGameplay(true)).resolves.toBe(false);
 
     const requestFullscreen = jest.fn<Promise<void>, [FullscreenOptions?]>(() =>
@@ -131,10 +141,7 @@ describe('FullscreenController', () => {
       .fn<Promise<void>, [FullscreenOptions?]>()
       .mockReturnValue(firstRequest);
     const documentRef = createDocument(requestFullscreen);
-    const controller = new FullscreenController(
-      documentRef,
-      createWindow(true),
-    );
+    const controller = new FullscreenController(documentRef, createWindow(true));
 
     const firstResult = controller.requestForGameplay(true);
     const concurrentResult = controller.requestForGameplay(true);

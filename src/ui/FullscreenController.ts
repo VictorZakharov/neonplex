@@ -1,4 +1,5 @@
 const COARSE_POINTER_QUERY = '(any-pointer: coarse)';
+const APP_DISPLAY_QUERIES = ['(display-mode: standalone)', '(display-mode: fullscreen)'];
 
 /** Requests one immersive gameplay session from a touch-initiated entry. */
 export class FullscreenController {
@@ -11,22 +12,18 @@ export class FullscreenController {
   ) {}
 
   public requestForGameplay(touchInitiated: boolean): Promise<boolean> {
-    const documentRef =
-      this.documentRef ?? (typeof document === 'undefined' ? null : document);
-    const windowRef =
-      this.windowRef ?? (typeof window === 'undefined' ? null : window);
+    const documentRef = this.documentRef ?? (typeof document === 'undefined' ? null : document);
+    const windowRef = this.windowRef ?? (typeof window === 'undefined' ? null : window);
     if (
       !touchInitiated ||
       documentRef === null ||
       windowRef === null ||
-      !this.isTouchCapable(windowRef)
+      !this.isTouchCapable(windowRef) ||
+      this.isAppDisplay(windowRef)
     ) {
       return Promise.resolve(false);
     }
-    if (
-      documentRef.fullscreenElement !== null &&
-      documentRef.fullscreenElement !== undefined
-    ) {
+    if (documentRef.fullscreenElement !== null && documentRef.fullscreenElement !== undefined) {
       return Promise.resolve(true);
     }
     if (documentRef.fullscreenEnabled === false) return Promise.resolve(false);
@@ -60,5 +57,12 @@ export class FullscreenController {
       typeof windowRef.matchMedia === 'function' &&
       windowRef.matchMedia(COARSE_POINTER_QUERY).matches;
     return hasCoarsePointer || windowRef.navigator.maxTouchPoints > 0;
+  }
+
+  private isAppDisplay(windowRef: Window): boolean {
+    return (
+      typeof windowRef.matchMedia === 'function' &&
+      APP_DISPLAY_QUERIES.some((query) => windowRef.matchMedia(query).matches)
+    );
   }
 }
