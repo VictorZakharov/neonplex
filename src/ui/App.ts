@@ -6,6 +6,7 @@ import { InputManager } from '../input/InputManager';
 import { Renderer, type IntelPreviewKind } from '../render/Renderer';
 import { appTemplate } from './appTemplate';
 import { formatTime } from './formatTime';
+import { FullscreenController } from './FullscreenController';
 import {
   isAudioMuted,
   isPerformanceVisible,
@@ -30,6 +31,7 @@ const MAX_STEPS = 6;
 export class App {
   private readonly abortController = new AbortController();
   private readonly audio = new AudioEngine();
+  private readonly fullscreen = new FullscreenController();
   private renderer: Renderer | null = null;
   private input: InputManager | null = null;
   private engine: GameEngine | null = null;
@@ -453,6 +455,9 @@ export class App {
       return;
     }
     event.preventDefault();
+    if (action === 'deploy-level') {
+      void this.fullscreen.requestForGameplay(this.root.dataset.inputMode === 'touch');
+    }
     void this.audio.activate().catch(() => undefined);
     switch (action) {
       case 'launch':
