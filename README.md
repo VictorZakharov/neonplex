@@ -6,7 +6,7 @@
 
 Neonplex is an original, Supaplex-inspired 2D puzzle-action game with a neon-industrial identity, large scrolling sectors, deterministic grid simulation, and high-refresh presentation. Mine the circuit, collect every Infotron, control gravity, outmaneuver live wall-following Sentinels, and reach the extraction gate.
 
-The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. Gameplay art is procedural, the HUD uses an original generated surface texture stored as an optimized JPEG, and sound is synthesized at runtime. It does not download fonts, music, sprites, or other runtime assets.
+The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. It is installable as a standalone Progressive Web App with an offline-cached game shell. Gameplay art is procedural, the HUD uses an original generated surface texture stored as an optimized JPEG, and sound is synthesized at runtime. It does not download fonts, music, sprites, or other runtime assets.
 
 **[Play the latest release](https://victorzakharov.github.io/neonplex/)**
 
@@ -21,21 +21,31 @@ npm start
 
 Open `http://localhost:8080`.
 
+## Install as an app
+
+Open the [latest release](https://victorzakharov.github.io/neonplex/) in a full browser, then use its install action:
+
+- On Android or a Chromium desktop browser, choose **Install app** from the browser menu or install icon.
+- On iPhone or iPad, choose **Share → Add to Home Screen** and keep **Open as Web App** enabled.
+- If an embedded or in-app browser does not expose installation, use its **Open in browser**, **Open in Chrome**, or **Open in Safari** action first.
+
+Launch Neonplex from the installed icon to run without the browser address bar. Installation does not remove browser controls from the tab where it was initiated. After the service worker finishes installing, the complete game shell is available for later offline launches. The manifest deliberately leaves orientation unlocked.
+
 ## Controls
 
-| Action | Keyboard and mouse | Touch |
-| --- | --- | --- |
-| Move | `WASD` or arrow keys | Drag the virtual joystick, or hold and drag from the Carrier; it moves toward the held finger and stops on release |
-| Travel along a clear straight corridor | - | Tap a reachable cell in the Carrier's row or column |
-| Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction | Hold Pulse + joystick direction |
-| Deploy a collected Pulse Disk beneath the Carrier | Hold `Space` alone for 1.5 seconds | Hold Pulse for 1.5 seconds |
-| Push a Zonk | Move horizontally into it when the next cell is clear | Virtual joystick |
-| Pan the map | Drag with either mouse button | Drag anywhere on the level away from the Carrier |
-| Return to camera follow | Move the Carrier | Move the Carrier |
-| Zoom from 68% to 172% | Mouse wheel | Pinch around a point |
-| Pause or resume | `Esc` or `P` | Pause button |
-| Restart a sector | Hold `R` for 2 seconds | Pause menu |
-| Navigate menus | Arrows/WASD, `Tab`, `Home`, `End`, `Enter`, `Space` | Tap controls |
+| Action                                                            | Keyboard and mouse                                    | Touch                                                                                                              |
+| ----------------------------------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Move                                                              | `WASD` or arrow keys                                  | Drag the virtual joystick, or hold and drag from the Carrier; it moves toward the held finger and stops on release |
+| Travel along a clear straight corridor                            | -                                                     | Tap a reachable cell in the Carrier's row or column                                                                |
+| Consume an adjacent dirt, Infotron, or pickup Disk without moving | Hold `Space` + direction                              | Hold Pulse + joystick direction                                                                                    |
+| Deploy a collected Pulse Disk beneath the Carrier                 | Hold `Space` alone for 1.5 seconds                    | Hold Pulse for 1.5 seconds                                                                                         |
+| Push a Zonk                                                       | Move horizontally into it when the next cell is clear | Virtual joystick                                                                                                   |
+| Pan the map                                                       | Drag with either mouse button                         | Drag anywhere on the level away from the Carrier                                                                   |
+| Return to camera follow                                           | Move the Carrier                                      | Move the Carrier                                                                                                   |
+| Zoom from 68% to 172%                                             | Mouse wheel                                           | Pinch around a point                                                                                               |
+| Pause or resume                                                   | `Esc` or `P`                                          | Pause button                                                                                                       |
+| Restart a sector                                                  | Hold `R` for 2 seconds                                | Pause menu                                                                                                         |
+| Navigate menus                                                    | Arrows/WASD, `Tab`, `Home`, `End`, `Enter`, `Space`   | Tap controls                                                                                                       |
 
 Disk input is deliberately chord-safe. A direction pressed with `Space` performs stationary consumption and resets the deployment timer. Only an uninterrupted 1.5-second hold deploys a Disk on the Carrier's current cell. Restart uses the same hold-to-confirm pattern but keeps its two-second threshold, with an in-world progress indicator and no duplicate popup underneath it.
 
@@ -54,11 +64,11 @@ Every sector opens with mandatory pre-breach intelligence. Its tile illustration
 
 ## Campaign
 
-| Sector | Grid | Infotrons | Focus |
-| --- | ---: | ---: | --- |
-| First Shift | 20x11 | 3 | Fundamentals, gravity, and tile identification |
-| Circuit Warren | 38x24 | 11 | Lateral scrolling, dynamic patrols, and map navigation |
-| Deep Cascade | 44x28 | 18 | Multi-deck demolition, gravity control, and chain reactions |
+| Sector         |  Grid | Infotrons | Focus                                                       |
+| -------------- | ----: | --------: | ----------------------------------------------------------- |
+| First Shift    | 20x11 |         3 | Fundamentals, gravity, and tile identification              |
+| Circuit Warren | 38x24 |        11 | Lateral scrolling, dynamic patrols, and map navigation      |
+| Deep Cascade   | 44x28 |        18 | Multi-deck demolition, gravity control, and chain reactions |
 
 All three layouts are distinct and selectable from the campaign menu. Local best scores, par-time bonuses, and S/A/B completion ranks persist in browser storage.
 
@@ -69,6 +79,7 @@ All three layouts are distinct and selectable from the campaign menu. Local best
 - Traversal excavation is linear; stationary consumption uses a vortex-like effect matched to the consumed tile.
 - Camera follow, focal-point-preserving wheel zoom, and manual map pan transition smoothly without lateral jumps.
 - Phones and tablets have a continuous analog-style movement joystick, queue-free hold-to-follow Carrier steering with immediate release, clear-corridor tap travel, stabilized midpoint-preserving pinch zoom, safe-area spacing, and live portrait/landscape reflow.
+- The installable PWA launches in a standalone, address-bar-free window, supports both orientations, includes normal and mask-safe Neonplex icons, and precaches every runtime asset for offline play.
 - Starting a selected level by touch requests fullscreen and asks the browser to hide navigation where supported; unsupported or denied requests fail safely without blocking play.
 - Wide layouts keep the tactical minimap in a dedicated right rail; narrow portrait layouts reserve a compact top HUD dock, while phone and tablet landscapes place a label-free status strip inside the title bar so the board receives the available height.
 - Touch surfaces suppress page overscroll, pull-to-refresh, browser swipe navigation where supported, and long-press callouts; controls remain inset from operating-system-reserved screen edges.
@@ -91,6 +102,7 @@ Large-map performance work includes:
 - a desynchronized Canvas 2D context where supported;
 - explicit teardown for the application, renderer, input listeners, observers, camera handlers, and audio.
 - gesture arbitration that gives two-finger pinch priority, separates taps from pans, and cancels held input safely on orientation, visibility, and pointer-capture changes.
+- a production-only Workbox service worker with build-hashed precaching, immediate updates, relative GitHub Pages paths, and scope-isolated production/preview caches.
 
 The renderer is split into focused camera, board, sprite, minimap, exit-indicator, preview, and effects modules. Input chords, motion tracking, gravity, explosions, and enemy navigation live in isolated systems. ESLint enforces a 500-line effective ceiling for implementation files, and interfaces are kept in dedicated `types.ts` or `*Types.ts` contract modules.
 
@@ -99,6 +111,7 @@ The renderer is split into focused camera, board, sprite, minimap, exit-indicato
 - `src/game` - deterministic simulation, campaign data, parsing, systems, domain events, and tests.
 - `src/render` - Canvas pipeline, cached layers, cameras, sprites, previews, minimap, and feedback effects.
 - `src/input` - keyboard, pointer, touch, hold, and chord translation.
+- `src/pwa` - install manifest, branded icons, scoped service-worker registration, and tests.
 - `src/audio` - gesture-gated synthesized event effects.
 - `src/ui` - application lifecycle, HUD, menus, persistence, accessibility, and responsive controls.
 
@@ -109,20 +122,21 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 195 deterministic tests across 27 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 204 deterministic tests across 28 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
-| Script | Purpose |
-| --- | --- |
-| `npm start` | Start the Webpack development server |
-| `npm run typecheck` | Run TypeScript without emitting output |
-| `npm run lint` | Enforce style and maintainability constraints |
-| `npm test` | Run Jest in-band |
-| `npm run check` | Run type-checking, linting, and tests |
-| `npm run build` | Produce an optimized `dist/` build |
+| Script                       | Purpose                                       |
+| ---------------------------- | --------------------------------------------- |
+| `npm start`                  | Start the Webpack development server          |
+| `npm run generate:pwa-icons` | Rebuild deterministic branded install icons   |
+| `npm run typecheck`          | Run TypeScript without emitting output        |
+| `npm run lint`               | Enforce style and maintainability constraints |
+| `npm test`                   | Run Jest in-band                              |
+| `npm run check`              | Run type-checking, linting, and tests         |
+| `npm run build`              | Produce an optimized `dist/` build            |
 
 ## Deployment and previews
 
-GitHub Actions publishes `main` to GitHub Pages. Same-repository pull requests receive an isolated preview under `/pr-preview/pr-N/`; closing a pull request removes its preview. Fork pull requests still run CI, but intentionally do not deploy untrusted code with write credentials.
+GitHub Actions publishes `main` to GitHub Pages. Same-repository pull requests receive an isolated preview under `/pr-preview/pr-N/`; closing a pull request removes its preview. Relative manifest and worker URLs keep those previews independently installable, while service-worker cache names incorporate their registration scope. Fork pull requests still run CI, but intentionally do not deploy untrusted code with write credentials.
 
 ## Browser support
 
