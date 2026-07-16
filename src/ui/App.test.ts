@@ -75,3 +75,55 @@ describe('App sound toggle', () => {
     expect(replaceChildren).toHaveBeenLastCalledWith('SOUND ON');
   });
 });
+
+describe('App fullscreen entry', () => {
+  it('requests fullscreen before deploying the selected level', () => {
+    const originalElement = Object.getOwnPropertyDescriptor(globalThis, 'Element');
+    const requestForGameplay = jest.fn(() => Promise.resolve(true));
+    const activate = jest.fn(() => Promise.resolve());
+    const beginLevel = jest.fn();
+    class FakeElement {
+      public readonly dataset = { ui: 'deploy-level' };
+
+      public closest(): FakeElement {
+        return this;
+      }
+    }
+    Object.defineProperty(globalThis, 'Element', {
+      configurable: true,
+      value: FakeElement,
+    });
+
+    try {
+      const app = new App({ dataset: { inputMode: 'touch' } } as unknown as HTMLElement);
+      Reflect.set(app, 'fullscreen', { requestForGameplay });
+      Reflect.set(app, 'audio', { activate });
+      Reflect.set(app, 'beginLevel', beginLevel);
+      Reflect.set(app, 'activeLevel', 2);
+      const onClick = Reflect.get(app, 'onClick') as (event: MouseEvent) => void;
+      const preventDefault = jest.fn();
+
+      onClick.call(app, {
+        preventDefault,
+        target: new FakeElement(),
+      } as unknown as MouseEvent);
+
+      expect(preventDefault).toHaveBeenCalledTimes(1);
+      expect(requestForGameplay).toHaveBeenCalledWith(true);
+      expect(activate).toHaveBeenCalledTimes(1);
+      expect(beginLevel).toHaveBeenCalledWith(2);
+      expect(requestForGameplay.mock.invocationCallOrder[0]).toBeLessThan(
+        activate.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      );
+      expect(requestForGameplay.mock.invocationCallOrder[0]).toBeLessThan(
+        beginLevel.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      );
+    } finally {
+      if (originalElement === undefined) {
+        Reflect.deleteProperty(globalThis, 'Element');
+      } else {
+        Object.defineProperty(globalThis, 'Element', originalElement);
+      }
+    }
+  });
+});

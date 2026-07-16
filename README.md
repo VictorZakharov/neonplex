@@ -69,6 +69,7 @@ All three layouts are distinct and selectable from the campaign menu. Local best
 - Traversal excavation is linear; stationary consumption uses a vortex-like effect matched to the consumed tile.
 - Camera follow, focal-point-preserving wheel zoom, and manual map pan transition smoothly without lateral jumps.
 - Phones and tablets have a continuous analog-style movement joystick, queue-free hold-to-follow Carrier steering with immediate release, clear-corridor tap travel, stabilized midpoint-preserving pinch zoom, safe-area spacing, and live portrait/landscape reflow.
+- Starting a selected level by touch requests fullscreen and asks the browser to hide navigation where supported; unsupported or denied requests fail safely without blocking play.
 - Wide layouts keep the tactical minimap in a dedicated right rail; narrow portrait layouts reserve a compact top HUD dock, while phone and tablet landscapes place a label-free status strip inside the title bar so the board receives the available height.
 - Touch surfaces suppress page overscroll, pull-to-refresh, browser swipe navigation where supported, and long-press callouts; controls remain inset from operating-system-reserved screen edges.
 - The responsive textured shell keeps compact extraction status, runtime, score, Disk inventory, minimap, and readable learning and pause screens visible after rotation.
@@ -108,7 +109,7 @@ npm run check
 npm run build
 ```
 
-`npm run check` runs strict type-checking, ESLint, and 185 deterministic tests across 26 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
+`npm run check` runs strict type-checking, ESLint, and 195 deterministic tests across 27 suites. Pull requests and pushes to `main` run the same checks in GitHub Actions.
 
 | Script | Purpose |
 | --- | --- |
