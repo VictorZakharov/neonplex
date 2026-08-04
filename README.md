@@ -8,6 +8,8 @@ Neonplex is an original, Supaplex-inspired 2D puzzle-action game with a neon-ind
 
 The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. It is installable as a standalone Progressive Web App with an offline-cached game shell. Gameplay art is procedural, the HUD uses an original generated surface texture stored as an optimized JPEG, and sound is synthesized at runtime. It does not download fonts, music, sprites, or other runtime assets.
 
+![Gameplay screenshot](screenshots/supaplex_gpt56_sol.jpg)
+
 **[Play the latest release](https://victorzakharov.github.io/neonplex/)**
 
 ## Run locally
