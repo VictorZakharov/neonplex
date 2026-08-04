@@ -12,6 +12,12 @@ The game is built with strict TypeScript, Webpack 5, Canvas 2D, and Web Audio. I
 
 **[Play the latest release](https://victorzakharov.github.io/neonplex/)**
 
+## Related Supaplex projects
+
+- [Supaplex Deepseek V4-F](https://github.com/VictorZakharov/supaplex-deepseek-v4-f)
+- [Supaplex Sonnet 5](https://github.com/VictorZakharov/supaplex-sonnet5)
+- [Supaplex Luna 56](https://github.com/VictorZakharov/supaplex-luna-56)
+
 ## Run locally
 
 Prerequisites: Node.js 24 or newer and npm 10 or newer.
